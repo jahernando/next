@@ -25,7 +25,7 @@ def energy_correction(energy, dz, alpha = 2.76e-4):
 
 
 def load_esmeralda_dfs(filename):
-    """ load DF from esmeralda:
+    """ load DFs from esmeralda:
     input:
         filename: str, complete filename
     returns:
@@ -66,7 +66,20 @@ def load_esmeralda_dfs(filename):
 #
 #     return dft
 
-def get_esmeralda_dfcomposite(filename):
+def get_dfesme(filename):
+    """
+    
+    return a complete DF from esmeralda
+
+    Parameters
+    ----------
+    filename : str, full filaneme of the esmeralda data
+    
+    Returns
+    -------
+    df : pd.DataFrame, complete DF from esmeralda
+
+    """
 
     dfe, dfs, dft = load_esmeralda_dfs(filename)
 
