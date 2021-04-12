@@ -14,7 +14,7 @@ import hipy.utils as ut
 
 #----  Selections
 
-def get_ranges_dfcomposite():
+def dfesme_ranges():
 
     ranges = {}
 
@@ -45,9 +45,9 @@ def get_ranges_dfcomposite():
     return ranges
 
 
-def get_selections_dfcomposite(df):
+def dfesme_selections(df):
 
-    ranges     = get_ranges_dfcomposite()
+    ranges     = dfesme_ranges()
     selections = Selections(df, ranges)
 
     selections.logical_and(('evt_out_of_map.False', 'numb_of_tracks.one', 'energy',
