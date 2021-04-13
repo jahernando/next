@@ -55,7 +55,7 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False):
         plt.scatter(dz, ene, alpha = alpha);
         label = pltext.label_parameters(kpars, kupars, ('a', 'b'), formate = '6.5f')
         #plt.errorbar(xmed, mus, ffun, sigs, label = label)
-        plt.hfun(xmed, mus, ffun, sigs, label = label, mode = 'plot')
+        pltext.hfun(xmed, mus, ffun, sigs, label = label, mode = 'plot')
         plt.legend();
         
     return kpars, kupars, mus, sigs
