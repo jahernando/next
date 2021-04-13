@@ -33,12 +33,12 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False):
     ys = [ene[ipos == i] for i in range(1, nbins)]
 
     epars, eupars = [], []
-    p0 = (10., 0.71, 0.02, 70., -70.)
+    #p0 = (10., 0.71, 0.02, 70., -70.)
     subplot = pltext.canvas(nbins, 2) if plot else None
     for i in range(nbins - 1):
         hfit = pltext.hfit if plot else histos.hfit
         if (plot): subplot(i + 1)
-        p0 = (100, 0.71, 0.02, 300., -400) if i == 0 else None
+        p0 = None if p0s is None else p0s[i]
         _, _, _, pars, upars, _ = hfit(ys[i], 60, 'gaus+poly.1', p0 = p0);
         epars .append(pars)
         eupars.append(upars)
