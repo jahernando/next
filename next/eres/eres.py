@@ -10,6 +10,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
+import hipy.utils  as ut
 import hipy.cfit   as cfit
 import hipy.histos as histos
 import hipy.pltext as pltext
@@ -22,6 +23,22 @@ def dz_energy_correction(energy, dz, alpha = 2.76e-4):
     """
     return energy/(1 - alpha * dz)
 
+
+def efficiencies(sels, names = None, plot = False):
+    xeffs = []
+    ksel = sels[0]
+    for isel in sels:
+        ksel = ksel & isel
+        xeffs.append(ut.efficiency(ksel))
+    effs  = [100. * eff[0] for eff in xeffs]
+    ueffs = [100. * eff[1] for eff in xeffs]
+    
+    if (plot):
+        names = np.range(len(sels)) if names is None else names
+        plt.errorbar(names, effs, ueffs, ls = '--', marker = 'o');
+        plt.grid(); plt.ylabel('efficiency (%)')
+        
+    return effs, ueffs
 
 #def energy_resolution(energy, p0, nbins, erange = None):
     
