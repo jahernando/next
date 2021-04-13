@@ -25,7 +25,7 @@ def dz_energy_correction(energy, dz, alpha = 2.76e-4):
 
 #def energy_resolution(energy, p0, nbins, erange = None):
     
-def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False):
+def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False, mbins = 60):
     
     bins  = np.percentile(dz, np.linspace(0., 100., nbins))
     counts, xedges, ipos = histos._profile(dz, ene, 'count', bins)
@@ -39,14 +39,14 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False):
         hfit = pltext.hfit if plot else histos.hfit
         if (plot): subplot(i + 1)
         p0 = None if p0s is None else p0s[i]
-        _, _, _, pars, upars, _ = hfit(ys[i], 60, 'gaus+poly.1', p0 = p0);
+        _, _, _, pars, upars, _ = hfit(ys[i], mbins, 'gaus+poly.1', p0 = p0);
         epars .append(pars)
         eupars.append(upars)
             
     _, xmed, xstd, _, _ = histos.hprofile(dz, ene, bins)
 
-    mus  = [p[1] for p in epars]
-    sigs = [p[2] for p in epars] 
+    mus  = np.array([p[1] for p in epars])
+    sigs = np.array([p[2] for p in epars])
     kpars, kupars, ffun = cfit.curve_fit(xmed, mus, sigma = sigs, fun = 'poly.1')
 
     if (plot):
