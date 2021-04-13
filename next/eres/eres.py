@@ -51,7 +51,8 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False):
 
     if (plot):
         pltext.canvas(1)
-        plt.scatter(dz, ene, alpha = 0.01); plt.xlim((0., 60.));
+        alpha = 1./ np.sqrt(len(ene))
+        plt.scatter(dz, ene, alpha = alpha);
         label = pltext.label_parameters(kpars, kupars, ('a', 'b'), formate = '6.5f')
         plt.errorbar(xmed, mus, sigs, marker = '*', ls = '--', color = 'blue', label = label)
         plt.legend();
