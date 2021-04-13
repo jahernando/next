@@ -2,27 +2,12 @@ import numpy  as np
 import pandas as pd
 import tables as tb
 
-import hipy.utils as ut
-
 
 #---- DataFrame
 
 to_df = pd.DataFrame.from_records
 
-DATADIR = "/data_extra2/jrenner/analysis/NEW"
-
-
-def get_esmeralda_filename(run_number):
-    run_number = str(run_number)
-    filename   = datadir + f'/{run_number}' + f'/hdf5/cdst/trigger2/cdst_combined_{run_number}' + '.h5'
-    return filename
-
-
-def energy_correction(energy, dz, alpha = 2.76e-4):
-    """ Apply Josh's energy correction by delta-z effect
-    """
-    return energy/(1 - alpha * dz)
-
+alpha = 2.76e-4 # Josh energy correction factor
 
 def load_esmeralda_dfs(filename):
     """ load DFs from esmeralda:
@@ -39,10 +24,10 @@ def load_esmeralda_dfs(filename):
     dfs = to_df(f.root.Summary.Events.read())
     dft = to_df(f.root.Tracking.Tracks.read())
 
-
     dft['dz_track'] = dft['z_max'] - dft['z_min']
-    dft['enecor']   = energy_correction(dft['energy'].values, dft['dz_track']. values)
-
+    energy, dz  = dft.energy.values, dft.dx_track
+    dft['enecor']   = energy/(1 - alpha * dz) 
+    
     return dfe, dfs, dft
 
 

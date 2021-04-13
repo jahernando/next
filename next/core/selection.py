@@ -7,10 +7,9 @@ Created on Mon Apr 12 12:30:15 2021
 """
 
 import numpy  as np
-import pandas as pd
-import tables as tb
 
-import hipy.utils as ut
+import hipy.utils   as ut
+import next.core.io as nio
 
 #----  Selections
 
@@ -97,7 +96,7 @@ class Selections:
         for key in self.sels.keys():
             nevt = np.sum(self[key])
             ieff = nevt/self.size
-            s += key + ' : ' + self[key].info + ', '
+            s += key + ' : ' + self[key].info + ' :  '
             s += str(nevt) + ', ' + '{0:6.5f}'.format(ieff) +'\n'
             # s += ' entries '+ str(nevt) + ', efficiency ' + '{0:6.5f}'.format(ieff) +'\n'
         return s
@@ -105,7 +104,7 @@ class Selections:
     def set_isin(self, dfref, name = 'isin',
                  labels = ['event', 'run'], offset = 10000000):
 
-        sel = df_isin(self.df, dfref, labels = labels, offset = offset)
+        sel = nio.df_isin(self.df, dfref, labels = labels, offset = offset)
 
         self.sels[name] = Selections._sel(sel, name)
 
