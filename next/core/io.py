@@ -25,7 +25,7 @@ def load_esmeralda_dfs(filename):
     dft = to_df(f.root.Tracking.Tracks.read())
 
     dft['dz_track'] = dft['z_max'] - dft['z_min']
-    energy, dz  = dft.energy.values, dft.dx_track
+    energy, dz  = dft.energy.values, dft.dz_track
     dft['enecor']   = energy/(1 - alpha * dz) 
     
     return dfe, dfs, dft
