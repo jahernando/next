@@ -34,10 +34,10 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = 0):
 
     epars, eupars = [], []
     p0 = (10., 0.71, 0.02, 70., -70.)
-    subplot = pltext.canvas(nbins, 2) if plot else None
+    subplot = pltext.canvas(nbins, 2) if plot > 1 else None
     for i in range(nbins - 1):
-        hfit = pltext.hfit if plot else histos.hfit
-        if (plot): subplot(i + 1)
+        hfit = pltext.hfit if plot > 1 else histos.hfit
+        if (plot > 1): subplot(i + 1)
         p0 = (100, 0.71, 0.02, 300., -400) if i == 0 else None
         _, _, _, pars, upars, _ = hfit(ys[i], 60, 'gaus+poly.1', p0 = p0);
         epars .append(pars)
@@ -49,7 +49,7 @@ def dz_effect(dz, ene, nbins = 10, p0s = None, plot = 0):
     sigs = [p[2] for p in epars] 
     kpars, kupars, _ = cfit.curve_fit(xmed, mus, sigma = sigs, fun = 'poly.1')
 
-    if (plot > 1):
+    if (plot):
         pltext.canvas(1)
         plt.scatter(dz, ene, alpha = 0.01); plt.xlim((0., 60.));
         label = pltext.label_parameters(kpars, kupars, ('a', 'b'), formate = '6.5f')
