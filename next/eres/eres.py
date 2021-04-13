@@ -46,7 +46,7 @@ def energy_fit(ene, bins, range = None, p0 = None, plot = False):
     
     hfit = pltext.hfit if plot else histos.hfit
     
-    kargs = {'residuals' : True, 'formate' : '6.5f'} if plot else {}
+    kargs = {'residuals' : True, 'formate' : '6.4f'} if plot else {}
     _, _, _, pars, upars, _ =  \
         hfit(ene, bins, range = range, fun = 'gaus+poly.1', p0 = p0, **kargs) 
     
