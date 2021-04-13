@@ -25,6 +25,20 @@ def dz_energy_correction(energy, dz, alpha = 2.76e-4):
 
 #def energy_resolution(energy, p0, nbins, erange = None):
     
+def energy_fit(ene, bins, range = None, p0 = None, plot = False):
+    
+    hfit = pltext.hfit if plot else histos.hfit
+    
+    kargs = {'residuals' : True, 'formate' : '6.5f'} if plot else {}
+    _, _, _, pars, upars, _ =  \
+        hfit(ene, bins, range = range, fun = 'gaus+poly.1', p0 = p0, **kargs) 
+    
+    ene0, sigma, usigma = pars[1], pars[2], upars[2]
+    r, ur               = 235. * sigma/ene0, 235. * usigma/ene0
+    
+    return ene0, sigma, usigma, r, ur
+    
+    
 def dz_effect(dz, ene, nbins = 10, p0s = None, plot = False, mbins = 60):
     
     bins  = np.percentile(dz, np.linspace(0., 100., nbins))
