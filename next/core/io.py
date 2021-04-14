@@ -17,6 +17,7 @@ def load_esmeralda_dfs(filename):
         dfe, DF, event data frame
         dfs, DF, summary data frame
         dft, DF, tracks data frame
+        f, file
     """
     f = tb.open_file(filename, 'r')
 
@@ -28,7 +29,7 @@ def load_esmeralda_dfs(filename):
     energy, dz  = dft.energy.values, dft.dz_track
     dft['enecor']   = energy/(1 - alpha * dz) 
     
-    return dfe, dfs, dft
+    return dfe, dfs, dft, f
 
 
 # def get_esmeralda_dft(filenames):
@@ -63,10 +64,11 @@ def get_dfesme(filename):
     Returns
     -------
     df : pd.DataFrame, complete DF from esmeralda
+    f  : file
 
     """
 
-    dfe, dfs, dft = load_esmeralda_dfs(filename)
+    dfe, dfs, dft, f = load_esmeralda_dfs(filename)
 
     dfe_section = dfe[['event', 'time', 'nS2', 'S1e', 'S2e', 'S2q', 'Nsipm']]
     dfs_section = dfs[['event', 'evt_energy', 'evt_ntrks', 'evt_nhits', 'evt_out_of_map']]
@@ -83,7 +85,7 @@ def get_dfesme(filename):
     dd = pd.merge(dft_section, dfe_section, on = 'event')
     dd = pd.merge(dd         , dfs_section, on = 'event')
 
-    return dd
+    return dd, f
 
 
 
