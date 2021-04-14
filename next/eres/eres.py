@@ -18,14 +18,17 @@ import hipy.pltext as pltext
 
 #import numpy as np
 
-def dz_energy_correction(energy, dz, alpha = 2.76e-4, scale = 1.):
+def dz_energy_correction(energy : float or np.array,
+                         dz     : float or np.array,
+                         alpha  : float = 2.76e-4,
+                         scale  : float  = 1.):
     """ Apply Josh's energy correction by delta-z effect
     """
-    return energy/(1 - alpha * dz)
+    return scale * energy/(1 - alpha * dz)
 
 
-def efficiencies(sels  : tuple(np.array(bool)),
-                 names : tuple(str) = None,
+def efficiencies(sels  : tuple,
+                 names : tuple = None,
                  plot  : bool = False):
     """
     
@@ -109,7 +112,7 @@ def energy_fit(ene   : np.array,
 def dz_effect_profile(dz    : np.array,
                       ene   : np.array,
                       nbins : int or np.array = 10, 
-                      p0s   : tuple(np.array(float)) = None,
+                      p0s   : tuple = None,
                       mbins : int = 60,
                       plot  : bool = False):
     """
@@ -163,9 +166,9 @@ def dz_effect_profile(dz    : np.array,
 
 
 
-def dz_effect(xmed : np.array(float),
-              mus  : np.array(float),
-              sigs : np.array(float),
+def dz_effect(xmed : np.array,
+              mus  : np.array,
+              sigs : np.array,
               fun  : float = 'poly.1',
               plot : bool = False):
     """
