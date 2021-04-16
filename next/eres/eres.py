@@ -248,7 +248,9 @@ def dz_effect(dz    : np.array,
     xmed, mus, sigs =  \
         dz_effect_profile(dz, ene, nbins, p0s = p0s, mbins = mbins, plot = plot)
         
-    if (plot): pltext.canvas(1)
+    if (plot): 
+        pltext.canvas(1)
+        plt.hist2d(dz, ene, (nbins, nbins))
     pars, upars = \
         dz_effect_profile_fit(xmed, mus, sigs, fun = fun, plot = plot) 
     
