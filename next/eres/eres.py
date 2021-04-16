@@ -166,11 +166,11 @@ def dz_effect_profile(dz    : np.array,
 
 
 
-def dz_effect(xmed : np.array,
-              mus  : np.array,
-              sigs : np.array,
-              fun  : float = 'poly.1',
-              plot : bool = False):
+def dz_effect_profile_fit(xmed : np.array,
+                          mus  : np.array,
+                          sigs : np.array,
+                          fun  : float = 'poly.1',
+                          plot : bool = False):
     """
 
     Fit the energy vs dz profile to a 1D-polynomial.
@@ -201,3 +201,55 @@ def dz_effect(xmed : np.array,
         plt.legend();
         
     return kpars, kupars
+
+
+def dz_effect(dz    : np.array,
+              ene   : np.array,
+              nbins : int or np.array = 10, 
+              p0s   : tuple = None,
+              mbins : int = 60,
+              fun   : str = 'poly.1',
+              plot  : bool = False):
+    """
+    
+    Compute the profile energy vs dz fitting each slice to a gaus+poly.1 
+    
+    Fit the means of the guassians vs dz to poly.1
+
+    returns the (x, y, ysigma) del profile and the parameters of the fit to poly.1
+
+
+    Parameters
+    ----------
+    dz    : np.array, dz-values
+    ene   : np.array, energy values
+    nbins : int or np.array, optional. Number of bins of the profile.
+            The default is 10.
+    p0s   : tuple(np.array(float)), optional. Each parameter must be (N, mu, sigma, a, b)
+            The default is None.
+    mbins : int, optional. Number of bins of the energy fit per slice.
+            The default is 60.
+    fun   : str, option. Name of the function to fit the profile.
+            Default is 'poly.1' (1 degree polynomial)
+    plot  : bool, optional. Plot the different energy fits of the profile
+            The default is False.
+    fun   
+
+    Returns
+    -------
+    xmed  : np.array(float), dz-values of the profile
+    mus   : np.array(float), mu-values of the gaussians
+    sigs  : np.array(float), sigma-values of the gaussian fit,
+    pars  : np.array(float), parameters of the function of the profile fit
+    upars : np.array(float), uncertainties of the parameters of the profile fit
+    
+    """
+    
+    xmed, mus, sigs =  \
+        dz_effect_profile(dz, ene, nbins, p0s = p0s, mbins = mbins, plot = plot)
+        
+    if (plot): pltext.canvas(1)
+    pars, upars = \
+        dz_effect_profile_fit(xmed, mus, sigs, fun = fun, plot = plot) 
+    
+    return xmed, mus, sigs, pars, upars
