@@ -317,7 +317,24 @@ def ds_eblob2scan(ene    : np.array,
     return eblob2_scan[:-1], nsigs, nbkgs
     
 
-def plt_eblob2scan(eblob2_scan, nsigs, nbkgs):
+def plt_eblob2scan(eblob2_scan : np.array,
+                   nsigs       : np.array,
+                   nbkgs       : np.array):
+    """
+    
+    plot the efficiency vs rejection (RoC) for the eblob2 cut
+
+    Parameters
+    ----------
+    eblob2_scan : np.array, value sof the eblob2 scan
+    nsigs       : np.array, number of signal events
+    nbkgs       : np.array, number of bkg events
+
+    Returns
+    -------
+    None.
+
+    """
     
     esigs = 100. * nsigs/nsigs[0]
     ebkgs = 100. * nbkgs/nbkgs[0]
