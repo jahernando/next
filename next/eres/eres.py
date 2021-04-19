@@ -316,3 +316,39 @@ def ds_eblob2scan(ene    : np.array,
     
     return eblob2_scan[:-1], nsigs, nbkgs
     
+
+def plt_eblob2scan(eblob2_scan, nsigs, nbkgs):
+    
+    esigs = 100. * nsigs/nsigs[0]
+    ebkgs = 100. * nbkgs/nbkgs[0]
+
+    subplot = pltext.canvas(4)
+
+    subplot(1)
+    plt.plot(eblob2_scan, nbkgs, marker = 'o', ls = '--', label = 'nkgs')
+    plt.plot(eblob2_scan, nsigs, marker = 'o', ls = '--', label = 'signal')
+    plt.xlabel('eblob2 threshold (MeV)'); plt.ylabel('number of events'); 
+    plt.grid(); plt.legend();
+
+    subplot(2)
+    plt.plot(eblob2_scan, ebkgs, marker = 'o', ls = '--', label = 'bkg eff')
+    plt.plot(eblob2_scan, esigs, marker = 'o', ls = '--', label = 'sig eff')
+    plt.xlabel('eblob2 threshold (MeV)'); plt.ylabel('efficiency (%)'); 
+    plt.grid(); plt.legend();
+
+    subplot(3)
+    plt.plot(100. - ebkgs, esigs, marker = 'o', ls = '--');
+    plt.xlabel('bkg rejection (%)'); plt.ylabel('signal efficiency (%)')
+    vs = np.linspace(0., 100., 10)
+    plt.plot(100. - vs, vs)
+    plt.grid(); 
+
+    subplot(4)
+    fom = 0.01* esigs/np.sqrt(0.01 * ebkgs)
+    #plt.plot(eblob2_scan[:-1], fom, marker = 'o', ls = '--', label = 'events sigma/sqrt(bkg)')
+    plt.plot(eblob2_scan, fom, marker = 'o', ls = '--', label = 'fom'); plt.grid();
+    plt.xlabel('eblob2 threshold (MeV)'); 
+    plt.ylabel('fom = $\epsilon_s/\sqrt{\epsilon_b}$'); 
+    
+    
+    return
