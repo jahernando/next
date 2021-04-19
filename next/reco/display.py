@@ -7,7 +7,7 @@ import hipy.pltext      as pltext
 import hipy.utils       as ut
 
 
-#from mpl_toolkits.mplot3d    import Axes3D
+from mpl_toolkits.mplot3d    import Axes3D
 
 def track(x       : np.array,
           y       : np.array, 
@@ -78,7 +78,7 @@ def event(x       : np.array,
 
     zsize, xysize = (0., 500.), (-200., 200)
 
-    fig = plt.figure(figsize=(12, 9));
+    fig  = plt.figure(figsize=(12, 9));
     #plt.subplots(2
     ax3D = fig.add_subplot(221, projection='3d')
     size   = scale       * (1. + rscale * rene)
