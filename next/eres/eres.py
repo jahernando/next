@@ -255,3 +255,64 @@ def dz_effect(dz    : np.array,
         dz_effect_profile_fit(xmed, mus, sigs, fun = fun, plot = plot) 
     
     return xmed, mus, sigs, pars, upars
+
+
+
+def ds_eblob2scan(ene    : np.array, 
+                  eblob2 : np.array, 
+                  nscan  : int = 10,
+                  mbins  : int = 60,
+                  p0     : np.array = None,
+                  plot   : bool = False):
+    """
+    
+    dot a scan in eblob2 energy, fit the energy distribution to gaus+poly.1d
+    compute the number of signal and bkg events for each cut
+
+    Parameters
+    ----------
+    ene    : np.array, energy values
+    eblob2 : np.array, blob2 energy values
+    nscan  : int, optional, number of eblob2 cuts.
+             The default is 10.
+    mbins  : int, optional, number of bins in the energy hfit
+             The default is 60.
+    p0     : np.array, optional, initial parameters of the hfit.
+             The default is None.
+    plot   : bool, optional, plot the hfit for each value of the scan
+             The default is False.
+
+    Returns
+    -------
+    eblob2_scan : np.array, values of the eblob2 threshold
+    nsigs       : np.array, signal events
+    nbkgs       : np.array, bkg events
+
+    """
+    
+    eblob2_scan = np.percentile(eblob2, np.linspace(0., 100., nscan))
+
+    hfit = pltext.hfit if plot else histos.hfit
+
+    if (plot):
+        subplot = pltext.canvas(nscan)
+    
+    nbkgs, nsigs = [], []
+    for i, eblob2_thr in enumerate(eblob2_scan[:-1]):
+        isel = ut.in_range(eblob2, (eblob2_thr, np.inf))
+        if (plot): subplot(i + 1)
+        ys, xs, eys, pars, upars, ffun = \
+            hfit(ene[isel], mbins, fun = 'gaus+poly.1', p0 = p0)
+        n, mu, sigma, a0, a1 = pars
+        pol = lambda x: a1 * x + a0
+        xcs = ut.centers(xs)
+        if (plot):
+            plt.plot(xcs, pol(xcs), color = 'red');
+        nitots = np.sum(ys)
+        nibkgs = np.sum(pol(xcs))
+        nbkgs.append(nibkgs)
+        nsigs.append(nitots - nibkgs)
+    nsigs, nbkgs = np.array(nsigs), np.array(nbkgs)
+    
+    return eblob2_scan[:-1], nsigs, nbkgs
+    
