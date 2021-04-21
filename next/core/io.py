@@ -92,10 +92,7 @@ def get_dfesme(filename):
 def df_zeros(labels, nsize = 1):
     dat = {}
     for label in labels:
-        ok         = True if label.find('.') > 0 else False
-        typ, label = label.split('.') if ok else (float, label) 
-        type       = int  if typ == 'I' else float
-        type       = bool if typ == 'B' else type
+        type       = int if label[0] in ['i', 'j', 'k', 'n'] else float
         dat[label] = np.zeros(nsize).astype(type)
     return pd.DataFrame(dat)
 
