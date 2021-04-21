@@ -92,9 +92,11 @@ def get_dfesme(filename):
 def df_zeros(labels, nsize = 1):
     dat = {}
     for label in labels:
-        type = int if label[0] in ['i', 'j', 'k', 'n'] else float
+        ok         = True if label.find('.') > 0 else False
+        typ, label = label.split('.') if ok else (float, label) 
+        type       = int  if typ == 'I' else float
+        type       = bool if typ == 'B' else type
         dat[label] = np.zeros(nsize).astype(type)
-    dat['event'] = np.zeros(nsize).astype(int)
     return pd.DataFrame(dat)
 
 
