@@ -17,26 +17,26 @@ def sorted_tracks(evt, emin = 0.02):
 
 
 track_sum = namedtuple('track_sum',
-                      ('id', 'ene', 'n',
+                      ('id', 'ene', 'size',
                        'xave', 'yave', 'zave', 
                        'dz',
                        'nnodes', 'enode', 'snode'))
 
 def _track(ik, evt):
     
-    sel   = (evt.track == ik).values
-    ene   = np.sum(evt.ene[sel])
-    size  = np.sum(sel)
-    xave  = np.mean(evt.x0[sel])
-    yave  = np.mean(evt.x1[sel])
-    dz    = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
-    dzmin = np.min(evt.x2[sel])
-    nodes = np.sum(evt.tnode == ik)
-    sel   = (evt.kid == ik).values
-    enode = evt.enode[sel]
-    snode = np.sum(evt.node == ik)
+    sel    = (evt.track == ik).values
+    ene    = np.sum(evt.ene[sel])
+    size   = np.sum(sel)
+    xave   = np.mean(evt.x0[sel])
+    yave   = np.mean(evt.x1[sel])
+    zave   = np.mean(evt.x3[sel])
+    dz     = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
+    nnodes = np.sum(evt.tnode == ik)
+    sel    = (evt.kid == ik).values
+    enode  = evt.enode[sel]
+    snode  = np.sum(evt.node == ik)
     
-    res = track_sum(ik, ene, size, xave, yave, dz, dzmin, nodes, enode, snode)
+    res = track_sum(ik, ene, size, xave, yave, zave, dz, nnodes, enode, snode)
     return res
  
 
