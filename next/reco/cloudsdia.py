@@ -1,3 +1,5 @@
+from collections import namedtuple
+
 import numpy             as np
 
 import clouds            as clouds
@@ -72,6 +74,126 @@ def sorted_tracks(evt, emin = 0.02):
 
 
 
+branch_sum = namedtuple('branch_sum', 
+                        ('id', 'ene', 'nsize', 'x', 'y', 'z', 'ecell', 'nlength', 'ipos', 'idis'))
+
+
+def _extreme(branch, evt, depth = 2):
+    
+    #print('branch ', branch)
+    knodes = branch[ -depth :]
+    enes   = [float(evt.enode[evt.kid == k]) for k in knodes]
+    #print('extreme nodes ', knodes)
+    #print('extreme enes  ', enes)
+
+    ik   = knodes[np.argmax(enes)]
+    #print('extreme node ', ik)
+    
+    ipos = np.argwhere(branch == ik)
+    #print('position ', ipos)
+
+    nlength = len(branch)
+    #print('length ', nlength)
+    idis    = nlength - ipos - 1
+    #print('ext dist     ', idis)
+    
+    ipos = np.argwhere(branch == ik)
+    #print('position ', ipos)
+
+    sel   = (evt.kid == ik).values
+    unode = evt.enode[sel].values
+    snode = np.sum(evt.node == ik)
+        
+    x     = evt.x0 [sel]
+    y     = evt.x1 [sel]
+    z     = evt.x2 [sel]
+    ecell = evt.ene[sel]
+    
+    nlength = len(branch)
+    
+    return ik, unode, snode, x, y, z, ecell, nlength, ipos, idis
+    
+
+def ana_extremes(evt, emin = 0.02, depth = 2):
+
+    #print('depth ', depth)
+    
+    ok = True
+    while ok:
+        npass = np.sum(evt.tpass > 0)
+        #print('trim before', np.sum(evt.tpass > 0))
+        evt        = clouds.trim(evt)
+        #print('trim after', np.sum(evt.tpass > 0))
+        ok = npass > np.sum(evt.tpass > 0)
+
+    tracks_ids = sorted_tracks(evt, emin)
+    trk_id = tracks_ids[0]
+    #print('track id', trk_id)
+    
+    sel   = (evt.track == trk_id).values
+    tpass = evt.tpass.values * np.array(sel, float)
+    kids  = evt.kid  .values
+    node  = evt.node .values
+    lnode = evt.lnode.values
+    enode = evt.enode.values
+
+    #TODO Insted of trim off the evt, can we remove the nodes from the passes??
+
+    passes = clouds.get_passes(tpass, node, lnode)
+    #print('passes ', passes)
+    udist  = clouds.nodes_idistance(passes)
+    #print('node distances ', udist)
+    branches_ = clouds.get_function_branches(passes)
+    
+    # get the blob candidates
+    knodes = np.array(list(udist.keys()), int)
+    enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
+    knodes, enes = clouds.sorted_by_energy(knodes, enes)
+    #print('nodes ', knodes)
+    #print('nodes energy ', enes)
+    
+    knodes = [k for k, ene in zip(knodes, enes) if ene > emin]
+    #print('nodes with energy : ', knodes)
+    kblobs = [k for k in knodes if udist[k] <= depth]
+    #print('nodes in extremes :', kblobs)
+    
+    labels = [label+'_ext' for label in branch_sum._fields]
+    
+    kblob  = kblobs[0]
+    #print('main blob ', kblob)
+    brans  = branches_(kblob)
+    #print('branches ', brans)
+    brans  = [bran  for bran in brans if len(bran) > depth]
+    if (len(brans) == 0): 
+        df          = nio.df_zeros(labels, 1)
+        df['i_ext'] = 0
+        df['n_ext'] = 0
+        print('no extremes !!')
+        return df
+    
+    #print('branches ', brans)
+    nbrans = len(brans)
+    df     = nio.df_zeros(labels, 1 + nbrans)
+    
+    df['i_ext'] = np.arange(1 + nbrans)
+    df['n_ext'] = 1 + nbrans
+    
+    # main blob
+    bran     = [kblob,]
+    dat      = _extreme(bran, evt, 1)
+    for k, label in enumerate(labels):
+        df[label][0] = dat[k]
+    df['idis_ext'][0] = udist[kblob] -1 # moify the distante to the extreme
+        
+    # other extremes
+    for i, bran in enumerate(brans):
+        dat = _extreme(bran, evt, depth)
+        for k, label in enumerate(labels):
+            df[label][ i + 1] = dat[k]
+            
+    return df
+
+
 def ana_blobs(evt, emin = 0.020, eblobmin = 0.020):
     
     #get the best energetic track
@@ -109,14 +231,18 @@ def ana_blobs(evt, emin = 0.020, eblobmin = 0.020):
     knodes = np.array(list(udist.keys()), int)
     enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
     knodes, enes = clouds.sorted_by_energy(knodes, enes)
-    for i, k in enumerate(knodes):
-        pos = float(evt.x0[kids == k]), float(evt.x1[kids == k]), float(evt.x2[kids == k])
+    #for i, k in enumerate(knodes):
+    #    pos = float(evt.x0[kids == k]), float(evt.x1[kids == k]), float(evt.x2[kids == k])
     
     knodes = [k for k, ene in zip(knodes, enes) if ene > eblobmin]
     kblobs = [k for k in knodes if udist[k] <= 2]
     
     kblob0 = kblobs[0]
     brans0 = branches_(kblob0)
+    
+    # select branches with more than 2 nodes
+    brans0 = [len(bran) > 2 for bran in brans0]
+    
     #bran0 = brans0[0]
     #for bran in brans0[1:]:
     #    if (len(bran) > len(bran0)): bran0 = bran
