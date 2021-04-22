@@ -122,6 +122,15 @@ def ana_extremes(evt, emin = 0.02, depth = 1):
 
     #print('depth ', depth)
     
+    labels = [label+'_ext' for label in extreme_sum._fields]
+
+    def _empty():
+        df            = nio.df_zeros(labels, 1)
+        df['ene_evt'] = np.sum(evt.ene)
+        df['i_ext']   = 0
+        df['n_exts']  = 0
+        return df
+    
     ok = True
     while ok:
         npass = np.sum(evt.tpass > 0)
@@ -144,6 +153,8 @@ def ana_extremes(evt, emin = 0.02, depth = 1):
     #TODO Insted of trim off the evt, can we remove the nodes from the passes??
 
     passes = clouds.get_passes(tpass, node, lnode)
+    if (len(passes) < 1):
+        return _empty()
     #print('passes ', passes)
     udist  = clouds.nodes_idistance(passes)
     #print('node distances ', udist)
@@ -169,18 +180,15 @@ def ana_extremes(evt, emin = 0.02, depth = 1):
     #print('branches ', brans)
     brans  = [bran  for bran in brans if len(bran) > depth]
     if (len(brans) == 0): 
-        df          = nio.df_zeros(labels, 1)
-        df['i_ext'] = 0
-        df['n_ext'] = 0
-        print('no extremes !!')
-        return df
+        return _empty()
     
     #print('branches ', brans)
     nbrans = len(brans)
     df     = nio.df_zeros(labels, 1 + nbrans)
     
-    df['i_ext'] = np.arange(1 + nbrans)
-    df['n_ext'] = 1 + nbrans
+    df['i_ext']   = np.arange(1 + nbrans)
+    df['n_exts']  = 1 + nbrans
+    df['ene_evt'] = np.sum(evt.ene)
     
     # main blob
     bran     = [kblob,]
