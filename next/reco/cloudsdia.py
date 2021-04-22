@@ -29,7 +29,7 @@ def _track(ik, evt):
     size   = np.sum(sel)
     xave   = np.mean(evt.x0[sel])
     yave   = np.mean(evt.x1[sel])
-    zave   = np.mean(evt.x3[sel])
+    zave   = np.mean(evt.x2[sel])
     dz     = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
     nnodes = np.sum(evt.tnode == ik)
     sel    = (evt.kid == ik).values
