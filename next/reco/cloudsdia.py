@@ -1,10 +1,44 @@
 from collections import namedtuple
-
 import numpy             as np
 
 import clouds            as clouds
-
 import next.core.io      as nio
+
+
+def sorted_tracks(evt, emin = 0.02):
+    
+    tracks_ids = np.unique(evt.track.values)
+    enes       = np.array([np.sum(evt.ene[evt.track == ik]) for ik in tracks_ids], float)
+    tracks_ids, enes = clouds.sorted_by_energy(tracks_ids, enes)
+    
+    tracks_ids = [id for id, ene in zip(tracks_ids, enes) if ene >= emin]
+
+    return tracks_ids
+
+
+track_sum = namedtuple('track_sum',
+                      ('id', 'ene', 'n',
+                       'xave', 'yave', 'zave', 
+                       'dz',
+                       'nnodes', 'enode', 'snode'))
+
+def _track(ik, evt):
+    
+    sel   = (evt.track == ik).values
+    ene   = np.sum(evt.ene[sel])
+    size  = np.sum(sel)
+    xave  = np.mean(evt.x0[sel])
+    yave  = np.mean(evt.x1[sel])
+    dz    = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
+    dzmin = np.min(evt.x2[sel])
+    nodes = np.sum(evt.tnode == ik)
+    sel   = (evt.kid == ik).values
+    enode = evt.enode[sel]
+    snode = np.sum(evt.node == ik)
+    
+    res = track_sum(ik, ene, size, xave, yave, dz, dzmin, nodes, enode, snode)
+    return res
+ 
 
 def ana_tracks(evt, emin = 0.020):
     """
@@ -23,59 +57,27 @@ def ana_tracks(evt, emin = 0.020):
 
     """
     
-    tracks_ids = np.unique(evt.track.values)
-    enes       = np.array([np.sum(evt.ene[evt.track == ik]) for ik in tracks_ids], float)
-    
-    tracks_ids, enes = clouds.sorted_by_energy(tracks_ids, enes)
-    
-    tracks_ids = [id for id, ene in zip(tracks_ids, enes) if ene >= emin]
-
+    tracks_ids = sorted_tracks(evt, emin)
     ntracks = len(tracks_ids)
     
-    def _track(ik):
-        sel   = (evt.track == ik).values
-        ene   = np.sum(evt.ene[sel])
-        size  = np.sum(sel)
-        xave  = np.mean(evt.x0[sel])
-        yave  = np.mean(evt.x1[sel])
-        dz    = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
-        dzmin = np.min(evt.x2[sel])
-        nodes = np.sum(evt.tnode == ik)
-        sel   = (evt.kid == ik).values
-        enode = evt.enode[sel]
-        snode = np.sum(evt.node == ik)
-        return ik, ene, size, xave, yave, dz, dzmin, nodes, enode, snode
-        
-    labels = ('itrk', 'idtrk', 'trk_ene', 'ntrk_size',
-              'trk_xave', 'trk_yave', 'trk_dz', 'trk_dzmin',
-              'ntrk_nodes', 'trk_enode', 'ntrk_snode')
+    labels = [label + '_trk' for label in track_sum._fields]
     df     = nio.df_zeros(labels, ntracks)
+    df['i_trk'] = np.arange(ntracks)
     for i, ik in enumerate(tracks_ids):
         data = _track(ik)
-        df['itrk'][i] = i
-        for k, label in enumerate(labels[1:]):
-            df[label][i] = data[k]
+        nio.df_fill_row(df, i, labels, data)
 
-    df['evt_ene']   = np.sum(evt.ene)
-    df['nevt_trks'] = ntracks
+    df['ene_evt']  = np.sum(evt.ene)
+    df['size_evt'] = len(evt)
+    df['n_trks']   = ntracks
             
     return df   
 
 
-def sorted_tracks(evt, emin = 0.02):
-    
-    tracks_ids = np.unique(evt.track.values)
-    enes       = np.array([np.sum(evt.ene[evt.track == ik]) for ik in tracks_ids], float)
-    tracks_ids, enes = clouds.sorted_by_energy(tracks_ids, enes)
-    
-    tracks_ids = [id for id, ene in zip(tracks_ids, enes) if ene >= emin]
 
-    return tracks_ids
-
-
-
-branch_sum = namedtuple('branch_sum', 
-                        ('id', 'ene', 'nsize', 'x', 'y', 'z', 'ecell', 'nlength', 'ipos', 'idis'))
+extreme_sum = namedtuple('extreme_sum', 
+                        ('id', 'ene', 'nsize', 'x', 'y', 'z', 
+                         'ecell', 'nlength', 'ipos', 'idis'))
 
 
 def _extreme(branch, evt, depth = 2):
@@ -111,7 +113,9 @@ def _extreme(branch, evt, depth = 2):
     
     nlength = len(branch)
     
-    return ik, unode, snode, x, y, z, ecell, nlength, ipos, idis
+    res = extreme_sum(ik, unode, snode, x, y, z, ecell, nlength, ipos, idis)
+    
+    return res
     
 
 def ana_extremes(evt, emin = 0.02, depth = 2):
@@ -157,7 +161,7 @@ def ana_extremes(evt, emin = 0.02, depth = 2):
     kblobs = [k for k in knodes if udist[k] <= depth]
     #print('nodes in extremes :', kblobs)
     
-    labels = [label+'_ext' for label in branch_sum._fields]
+    labels = [label+'_ext' for label in extreme_sum._fields]
     
     kblob  = kblobs[0]
     #print('main blob ', kblob)
@@ -194,134 +198,134 @@ def ana_extremes(evt, emin = 0.02, depth = 2):
     return df
 
 
-def ana_blobs(evt, emin = 0.020, eblobmin = 0.020):
+# def ana_blobs(evt, emin = 0.020, eblobmin = 0.020):
     
-    #get the best energetic track
-    tracks_ids = sorted_tracks(evt, emin)
-    trk_id = tracks_ids[0]
+#     #get the best energetic track
+#     tracks_ids = sorted_tracks(evt, emin)
+#     trk_id = tracks_ids[0]
     
-    # select passes of the main track
-    sel   = (evt.track == trk_id).values
-    epass = evt.tpass.values * np.array(sel, float)
+#     # select passes of the main track
+#     sel   = (evt.track == trk_id).values
+#     epass = evt.tpass.values * np.array(sel, float)
     
-    # get the values
-    kids  = evt.kid  .values
-    node  = evt.node .values
-    lnode = evt.lnode.values
-    enode = evt.enode.values
+#     # get the values
+#     kids  = evt.kid  .values
+#     node  = evt.node .values
+#     lnode = evt.lnode.values
+#     enode = evt.enode.values
     
-    # get the passes
-    passes    = clouds.get_passes(epass, node, lnode)
-    #print('passes', passes)
-    knodes    = np.unique(np.concatenate(passes))
-    #print('nodes', knodes)
-    enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
-    knodes, enes = clouds.sorted_by_energy(knodes, enes)
-    #print('nodes ', knodes)
-    #print('enes  ', enes)
-    #knodes = [k for k, ene in zip(knodes, enes) if ene > eblobmin]
-    #print('good nodes ', knodes)
-    #passes = [ipass for ipass in passes if np.sum(np.isin(ipass, knodes)) == 2]
-    #print('good passes ', passes)
+#     # get the passes
+#     passes    = clouds.get_passes(epass, node, lnode)
+#     #print('passes', passes)
+#     knodes    = np.unique(np.concatenate(passes))
+#     #print('nodes', knodes)
+#     enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
+#     knodes, enes = clouds.sorted_by_energy(knodes, enes)
+#     #print('nodes ', knodes)
+#     #print('enes  ', enes)
+#     #knodes = [k for k, ene in zip(knodes, enes) if ene > eblobmin]
+#     #print('good nodes ', knodes)
+#     #passes = [ipass for ipass in passes if np.sum(np.isin(ipass, knodes)) == 2]
+#     #print('good passes ', passes)
     
-    udist     = clouds.nodes_idistance(passes)    
-    branches_ = clouds.get_function_branches(passes)
+#     udist     = clouds.nodes_idistance(passes)    
+#     branches_ = clouds.get_function_branches(passes)
     
-    # get the blob candidates
-    knodes = np.array(list(udist.keys()), int)
-    enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
-    knodes, enes = clouds.sorted_by_energy(knodes, enes)
-    #for i, k in enumerate(knodes):
-    #    pos = float(evt.x0[kids == k]), float(evt.x1[kids == k]), float(evt.x2[kids == k])
+#     # get the blob candidates
+#     knodes = np.array(list(udist.keys()), int)
+#     enes   = np.array([enode[kids == ki][0] for ki in knodes], float)
+#     knodes, enes = clouds.sorted_by_energy(knodes, enes)
+#     #for i, k in enumerate(knodes):
+#     #    pos = float(evt.x0[kids == k]), float(evt.x1[kids == k]), float(evt.x2[kids == k])
     
-    knodes = [k for k, ene in zip(knodes, enes) if ene > eblobmin]
-    kblobs = [k for k in knodes if udist[k] <= 2]
+#     knodes = [k for k, ene in zip(knodes, enes) if ene > eblobmin]
+#     kblobs = [k for k in knodes if udist[k] <= 2]
     
-    kblob0 = kblobs[0]
-    brans0 = branches_(kblob0)
+#     kblob0 = kblobs[0]
+#     brans0 = branches_(kblob0)
     
-    # select branches with more than 2 nodes
-    brans0 = [len(bran) > 2 for bran in brans0]
+#     # select branches with more than 2 nodes
+#     brans0 = [len(bran) > 2 for bran in brans0]
     
-    #bran0 = brans0[0]
-    #for bran in brans0[1:]:
-    #    if (len(bran) > len(bran0)): bran0 = bran
-    #print('bran0', kblob0, bran0)
+#     #bran0 = brans0[0]
+#     #for bran in brans0[1:]:
+#     #    if (len(bran) > len(bran0)): bran0 = bran
+#     #print('bran0', kblob0, bran0)
     
-    def _track(ik):
-        sel   = (evt.track == ik).values
-        ene   = np.sum(evt.ene[sel])
-        size  = np.sum(sel)
-        xave  = np.mean(evt.x0[sel])
-        yave  = np.mean(evt.x1[sel])
-        dz    = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
-        dzmin = np.min(evt.x2[sel])
-        nodes = np.sum(evt.tnode == ik)
-        sel   = (evt.kid == ik).values
-        return ik, ene, size, xave, yave, dz, dzmin, nodes
+#     def _track(ik):
+#         sel   = (evt.track == ik).values
+#         ene   = np.sum(evt.ene[sel])
+#         size  = np.sum(sel)
+#         xave  = np.mean(evt.x0[sel])
+#         yave  = np.mean(evt.x1[sel])
+#         dz    = np.max(evt.x2[sel]) - np.min(evt.x2[sel])
+#         dzmin = np.min(evt.x2[sel])
+#         nodes = np.sum(evt.tnode == ik)
+#         sel   = (evt.kid == ik).values
+#         return ik, ene, size, xave, yave, dz, dzmin, nodes
     
-    def _blob(kblob):
-        sel   = kids == kblob
-        unode = enode[sel]
-        snode = np.sum(evt.node == kblob)
-        idis  = udist[kblob]
+#     def _blob(kblob):
+#         sel   = kids == kblob
+#         unode = enode[sel]
+#         snode = np.sum(evt.node == kblob)
+#         idis  = udist[kblob]
         
-        x     = evt.x0[sel]
-        y     = evt.x1[sel]
-        z     = evt.x2[sel]
-        ecell = evt.ene[sel]
+#         x     = evt.x0[sel]
+#         y     = evt.x1[sel]
+#         z     = evt.x2[sel]
+#         ecell = evt.ene[sel]
         
-        brans  = branches_(kblob)
-        nbrans = len(brans)
-        #ibran  = brans[0]
-        #for bran in brans[1:]:
-        #     if (len(bran) > len(ibran)): ibran = bran
-        #print('ibran ', kblob, ibran)
+#         brans  = branches_(kblob)
+#         nbrans = len(brans)
+#         #ibran  = brans[0]
+#         #for bran in brans[1:]:
+#         #     if (len(bran) > len(ibran)): ibran = bran
+#         #print('ibran ', kblob, ibran)
 
-        lbran  = np.max([len(bran) for bran in brans])
+#         lbran  = np.max([len(bran) for bran in brans])
         
-        kpos0 = [np.argwhere(bran == kblob)[0] \
-                for bran in brans0 if len(np.argwhere(bran == kblob)) == 1]
-        kpos0 = np.min(kpos0) if len(kpos0) > 0 else -1
-        #kpos0 = np.argwhere(bran0 == kblob )[0] if len(np.argwhere(bran0 == kblob )) == 1 else -1 
-        #kpos  = np.argwhere(ibran == kblob0)[0] if len(np.argwhere(ibran == kblob0)) == 1 else -1 
+#         kpos0 = [np.argwhere(bran == kblob)[0] \
+#                 for bran in brans0 if len(np.argwhere(bran == kblob)) == 1]
+#         kpos0 = np.min(kpos0) if len(kpos0) > 0 else -1
+#         #kpos0 = np.argwhere(bran0 == kblob )[0] if len(np.argwhere(bran0 == kblob )) == 1 else -1 
+#         #kpos  = np.argwhere(ibran == kblob0)[0] if len(np.argwhere(ibran == kblob0)) == 1 else -1 
 
     
-        kpos1 = [np.argwhere(bran == kblob0)[0] \
-                for bran in brans if len(np.argwhere(bran == kblob0)) == 1]
-        kpos1 = np.min(kpos1) if len(kpos1) > 0 else -1
+#         kpos1 = [np.argwhere(bran == kblob0)[0] \
+#                 for bran in brans if len(np.argwhere(bran == kblob0)) == 1]
+#         kpos1 = np.min(kpos1) if len(kpos1) > 0 else -1
     
-        return kblob, unode, snode, idis, x, y, z, ecell, nbrans, lbran, kpos0, kpos1
+#         return kblob, unode, snode, idis, x, y, z, ecell, nbrans, lbran, kpos0, kpos1
     
         
-    labels = ('iblob', 'idblob', 'blob_e', 'blob_size', 'iblob_dist',
-              'blob_x', 'blob_y', 'blob_z', 'blob_ecell',
-              'nblob_brans', 'nblob_lbran',
-              'iblob_i0', 'iblob_i1')
+#     labels = ('iblob', 'idblob', 'blob_e', 'blob_size', 'iblob_dist',
+#               'blob_x', 'blob_y', 'blob_z', 'blob_ecell',
+#               'nblob_brans', 'nblob_lbran',
+#               'iblob_i0', 'iblob_i1')
         
-    nblobs = len(kblobs)
-    df = nio.df_zeros(labels, nblobs)
-    for i, kb in enumerate(kblobs):
-        data = _blob(kb)
-        df['iblob'][i] = i
-        for k, label in enumerate(labels[1:]):
-            df[label][i] = data[k]
+#     nblobs = len(kblobs)
+#     df = nio.df_zeros(labels, nblobs)
+#     for i, kb in enumerate(kblobs):
+#         data = _blob(kb)
+#         df['iblob'][i] = i
+#         for k, label in enumerate(labels[1:]):
+#             df[label][i] = data[k]
         
-    df['nblobs']    = nblobs
-    df['evt_ene']   = np.sum(evt.ene)
-    df['nevt_size'] = len(evt.ene)
+#     df['nblobs']    = nblobs
+#     df['evt_ene']   = np.sum(evt.ene)
+#     df['nevt_size'] = len(evt.ene)
     
-    trk_ik, trk_ene, trk_size, trk_xave, trk_yave, trk_dz, trk_zmin, trk_nodes = _track(kblob0)
-    df['trk_id']     = trk_id
-    df['trk_ene']    = trk_ene
-    #df['ntrk_size']  = trk_size
-    #df['trk_xave']   = trk_xave
-    #df['trk_yave']   = trk_yave
-    df['trk_dz']     = trk_dz
-    #df['trk_zmin']   = trk_zmin
-    #df['ntrk_nodes'] = trk_nodes
+#     trk_ik, trk_ene, trk_size, trk_xave, trk_yave, trk_dz, trk_zmin, trk_nodes = _track(kblob0)
+#     df['trk_id']     = trk_id
+#     df['trk_ene']    = trk_ene
+#     #df['ntrk_size']  = trk_size
+#     #df['trk_xave']   = trk_xave
+#     #df['trk_yave']   = trk_yave
+#     df['trk_dz']     = trk_dz
+#     #df['trk_zmin']   = trk_zmin
+#     #df['ntrk_nodes'] = trk_nodes
 
-    return df
+#     return df
 
 
 # #import tables            as tb

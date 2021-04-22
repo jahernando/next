@@ -97,6 +97,32 @@ def df_zeros(labels, nsize = 1):
     return pd.DataFrame(dat)
 
 
+def df_fill_row(df     : pd.DataFrame,
+                irow   : int,
+                labels : tuple,
+                data   : tuple):
+    """
+    
+    fill a row of a DF with values of data that correspond to the labels
+
+    Parameters
+    ----------
+    df     : pd.DataFrame
+    irow   : int, index of the row to fill
+    labels : tuple(str), labels of the columns to fill
+    data   : tuple, values to fill. In the same sequence as labels
+
+    Returns
+    -------
+    df     : pd.DataFrame
+
+    """
+    
+    for k, label in enumerate(labels):
+        df[label][irow] = data[k]
+    return df
+
+
 def df_concat(dfs, runs = None, label = 'run'):
 
     runs = runs if runs is not None else range(len(dfs))
