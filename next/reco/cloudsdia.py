@@ -64,7 +64,7 @@ def ana_tracks(evt, emin = 0.020):
     df     = nio.df_zeros(labels, ntracks)
     df['i_trk'] = np.arange(ntracks)
     for i, ik in enumerate(tracks_ids):
-        data = _track(ik)
+        data = _track(ik, evt)
         nio.df_fill_row(df, i, labels, data)
 
     df['ene_evt']  = np.sum(evt.ene)
