@@ -118,7 +118,7 @@ def _extreme(branch, evt, depth = 2):
     return res
     
 
-def ana_extremes(evt, emin = 0.02, depth = 2):
+def ana_extremes(evt, emin = 0.02, depth = 1):
 
     #print('depth ', depth)
     
