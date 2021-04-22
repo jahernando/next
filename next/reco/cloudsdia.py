@@ -135,7 +135,10 @@ def ana_extremes(evt, emin = 0.02, depth = 1):
     while ok:
         npass = np.sum(evt.tpass > 0)
         #print('trim before', np.sum(evt.tpass > 0))
-        evt        = clouds.trim(evt)
+        try:
+            evt        = clouds.trim(evt)
+            print('trim failure!')
+            return _empty()
         #print('trim after', np.sum(evt.tpass > 0))
         ok = npass > np.sum(evt.tpass > 0)
 
