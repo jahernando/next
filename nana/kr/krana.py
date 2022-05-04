@@ -117,7 +117,7 @@ def residuals_(ts, es, par, cov):
 
 KrMap = namedtuple('KrMap', 
                    ('counts', 'eref', 'dedt', 'dtref', 'ueref', 'udedt', 'cov',
-                    'chi2', 'pvalue', 'success',
+                    'chi2', 'pvalue', 'sigma', 'success',
                     'bin_centers', 'bin_edges', 'bin_indices', 'residuals'))
 
 def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
@@ -140,6 +140,7 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
     udedt = np.zeros(shape = counts.shape)
     cov   = np.zeros(shape = counts.shape)
     chi2  = np.zeros(shape = counts.shape)
+    sig   = np.zeros(shape = counts.shape)
     pval  = np.zeros(shape = counts.shape)
     
     success   = counts > counts_min  
@@ -159,15 +160,16 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
         udedt[i0, i1] = np.sqrt(var[1, 1])
         cov  [i0, i1] = var[0, 1]
         
-        res, _ , sig = residuals_(ts - tij, enes, par, var)
-        residuals[ijsel] = res/sig
+        res, _ , ijsig = residuals_(ts - tij, enes, par, var)
+        residuals[ijsel] = res/ijsig
         ijchi2 = np.sum(res * res)/(len(res) - 2)
         ijpval = stats.shapiro(res)[1] if (len(res) > 3) else 0.
         chi2  [i0, i1] = ijchi2
         pval  [i0, i1] = ijpval
+        sig   [i0, i1] = ijsig
         
     return KrMap(counts, eref, dedt, dtref, ueref, udedt, cov,
-                 chi2, pval, success,
+                 chi2, pval, sig, success,
                  cbins, ebins, ibins, 
                  residuals)
 
@@ -288,8 +290,14 @@ def plot_xyvar(var, bins = None, title = '', mask = None, nbins = 100):
     mesh   = np.meshgrid(cbins[0], cbins[1])
     canvas = pltext.canvas(2, 2)
     canvas(1)
-    plt.hist2d(mesh[0][mask].ravel(), mesh[1][mask].ravel(), bins = bins,
-               weights = var[mask].T.ravel());
+    uvar   = np.copy(var) 
+    if (var.dtype != bool):
+        uvar[~mask] = np.nan
+    plt.hist2d(mesh[0].ravel(), mesh[1].ravel(), bins = bins,
+               weights = uvar.T.ravel());
+    #plt.hist2d(mesh[0][mask].ravel(), mesh[1][mask].ravel(), bins = bins,
+    #           weights = var[mask].T.ravel());
+
     plt.xlabel('x'); plt.ylabel('y'); plt.title(title);
     plt.colorbar();
     canvas(2)
