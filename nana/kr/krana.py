@@ -117,7 +117,7 @@ def residuals_(ts, es, par, cov):
 
 KrMap = namedtuple('KrMap', 
                    ('counts', 'eref', 'dedt', 'dtref', 'ueref', 'udedt', 'cov',
-                    'chi2', 'pvalue',
+                    'chi2', 'pvalue', 'success',
                     'bin_centers', 'bin_edges', 'bin_indices', 'residuals'))
 
 def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
@@ -142,10 +142,10 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
     chi2  = np.zeros(shape = counts.shape)
     pval  = np.zeros(shape = counts.shape)
     
-    mask = counts > counts_min
+    success = counts > counts_min
       
     residuals = -99999 * np.ones(len(energy))
-    for i0, i1 in np.argwhere(mask == True):
+    for i0, i1 in np.argwhere(success == True):
         ijsel = indices == int(ref * i1 + i0)
         ts, enes = dtime[ijsel], energy[ijsel]
         #print(len(ts), len(enes), counts[i0, i1], np.sum(ijsel))
@@ -166,7 +166,8 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
         chi2  [i0, i1] = ijchi2
         pval  [i0, i1] = ijpval
         
-    return KrMap(counts, eref, dedt, dtref, ueref, udedt, cov, chi2, pval,
+    return KrMap(counts, eref, dedt, dtref, ueref, udedt, cov,
+                 chi2, pval, success,
                  cbins, ebins, ibins, 
                  residuals)
 
@@ -183,12 +184,11 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     indices =  ref * ibins[1] + ibins[0]
 
 
-    counts = krmap.counts
     eref   = krmap.eref
     dtref  = krmap.dtref
     dedt   = krmap.dedt
     
-    mask   = counts > 3 if mask is None else mask
+    mask   = krmap.success if mask is None else mask
     
     corr_energy = np.zeros(len(energy))
     
