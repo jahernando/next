@@ -16,6 +16,7 @@ from   scipy       import optimize
 
 
 import matplotlib.pyplot as plt
+import hipy.histos       as histos
 import hipy.pltext       as pltext
 import hipy.profile      as prof
 
@@ -150,7 +151,7 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
         ijsel = indices == int(ref * i1 + i0)
         ts, enes = dtime[ijsel], energy[ijsel]
         #print(len(ts), len(enes), counts[i0, i1], np.sum(ijsel))
-        tij = np.median(ts) if dt0 is None else dt0
+        tij = np.mean(ts) if dt0 is None else dt0
         st_fun = lambda ts, a, b : a - b * (ts - tij)
         par, var = optimize.curve_fit(st_fun, ts, enes)
         eref [i0, i1] = par[0]
@@ -205,7 +206,116 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
         corr_energy[ijsel] = scale * enes / cenes
 
     return corr_energy, ibins    
+
+
+#--- Save and Load into/from h5
+
+_type_names           = {}
+_type_names['KrMap']  = ('counts', 'eref', 'dedt', 'dtref', 'ueref',
+                        'udedt', 'cov', 'chi2', 'pvalue', 'sigma', 'success')
+_type_names['Profile'] = ('counts', 'mean', 'std', 'chi2', 'pvalue', 'success')
+
+_type            = {}
+_type['KrMap']   = KrMap
+_type['Profile'] = prof.Profile
     
+
+def krmap_save(krmap, key, ofile):
+    
+    maptype = 'KrMap' if isinstance(krmap, KrMap) else 'Profile'
+    
+    names = _type_names[maptype]            
+
+    odf = {}
+    for name in names: odf[name] = getattr(krmap, name).ravel()
+
+    mesh = np.meshgrid(*krmap.bin_centers)
+    odf['x'] = mesh[0].ravel()
+    odf['y'] = mesh[1].ravel()
+    
+    odf = pd.DataFrame(odf)
+    
+    obins = {0: krmap.bin_edges[0], 1: krmap.bin_edges[1]}
+    obins = pd.DataFrame(obins)
+    
+    odf  .to_hdf(ofile, key = key + '/krmap', mode = 'a')
+    obins.to_hdf(ofile, key = key + '/bins' , mode = 'a')
+    
+    return odf, obins
+
+def krmap_read(key, ifile = './krmap_test.h5', maptype = 'KrMap'):
+    
+    idf   = pd.read_hdf(ifile, key = key + '/krmap')
+    ibins = pd.read_hdf(ifile, key = key + '/bins')
+    
+    bin_edges   = ibins[0].values, ibins[1].values
+    bin_centers = [0.5*(b[1:] + b[:-1]) for b in bin_edges]
+    residuals   = None
+    bin_indices = None
+    
+    shape  = len(ibins[0])-1, len(ibins[1])-1
+    names  = _type_names[maptype]
+    vars   = [idf[name].values.reshape(shape) for name in names]
+    _itype = _type[maptype]
+    
+    xmap = _itype(*vars, bin_centers, bin_edges, bin_indices, residuals)
+    return xmap
+    
+
+#---- Accept Residuals
+
+def accept_residuals(residuals, 
+                     nbins = 100, range = (-5, 5.),
+                     fun = 'gaus',
+                     nsigma = 3.5, 
+                     min_sigma = 0.9, 
+                     plot = False):
+    xsel       = ~np.isnan(residuals)
+    _, _, _, pars, _, _  = histos.hfit(residuals[xsel], nbins, range = range, fun = fun);
+    sigma      = pars[2]
+    
+    if (plot):
+        canvas = pltext.canvas(2, 2)
+        canvas(1)
+        pltext.hist(residuals[xsel], nbins);
+        plt.yscale('log');
+        plt.xlabel('normalized residuals');
+        canvas(2)
+        pltext.hfit(residuals[xsel], nbins, range = range, fun = fun);
+        plt.yscale('log'); plt.ylim((1, 1e5));
+        plt.xlabel('normalized residuals');
+        plt.show()
+        
+    done  = sigma > min_sigma
+    sel   = xsel if done else np.abs(residuals) <= nsigma * sigma
+    if (np.sum(sel) == np.sum(xsel)): done = True
+    eff = 100 * np.sum(sel)/len(residuals)
+    print('sigma {:4.2f}'.format(sigma), 'done ', done, ' eff {:4.2f}'.format(eff))    
+
+    return done, sel
+
+
+# def _accept_residuals(krmap, max_sigma = 3.4):
+#     xsel = ~np.isnan(krmap.residuals)
+#     canvas = pltext.canvas(2, 2)
+#     canvas(1)
+#     pltext.hist(krmap.residuals[xsel], 100);
+#     plt.yscale('log');
+#     plt.xlabel('normalized residuals');
+#     canvas(2)
+#     cc = pltext.hfit(krmap.residuals[xsel], 100, range = (-1.5, 1.5), fun = 'gaus');
+#     pars = cc[3]
+#     sigma = pars[2]
+#     print('sigma ', sigma)
+#     plt.yscale('log'); plt.ylim((1, 1e5));
+#     plt.xlabel('normalized residuals');
+#     plt.show()
+#     sigma  = 3.5 * sigma 
+#     #sigma = input('sigma of the accepted residuals (>=5 (all)) ')
+#     done  = sigma > max_sigma
+#     print('done ', done)
+#     sel   = xsel if done else np.abs(krmap.residuals) <= 3.5 * sigma
+#     return done, sel
 
 #--- Plotting
 
@@ -231,7 +341,8 @@ def plot_data(df, bins):
     plt.xlabel('drift time (ms)'); plt.ylabel('energy (keV)')
     plt.colorbar();
     canvas(6)
-    mean, ebins, _  = stats.binned_statistic_dd((df.x, df.y), df.energy, bins = bins , statistic = 'mean')
+    mean, ebins, _  = stats.binned_statistic_dd((df.x, df.y), df.energy,
+                                                bins = bins , statistic = 'mean')
     cbins = [0.5 * (b[1:] + b[:-1]) for b in ebins]
     mesh = np.meshgrid(*cbins)
     plt.hist2d(mesh[0].ravel(), mesh[1].ravel(), bins = ebins, weights = mean.T.ravel())

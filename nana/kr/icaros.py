@@ -32,12 +32,9 @@ def get_correction(maps):
     """ Return correction faction as variables (x, y, z) using the map
     """
 
-    vdrift    = np.mean(maps.t_evol.dv)
-    print('drift velocity ', vdrift)
-    _corrfac  = cof.apply_all_correction(maps, apply_temp = True,
+    _corrfac  = cof.apply_all_correction(maps, apply_temp = False,
                                           norm_strat = cof.norm_strategy.kr)
     def corrfac(x, y, dt, times):
-        #dt = z/vdrift
         return _corrfac(x, y, dt, times)
 
     return corrfac
