@@ -39,6 +39,7 @@ def get_correction(maps):
 
     return corrfac
 
+
 def get_corrz(maps):
     """ Return correction faction as variables (x, y, z) using the map
     """

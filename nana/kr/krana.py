@@ -180,38 +180,72 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
 
 
 
+
 def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     
-    # TODO: improve!
     
-    bins = krmap.bin_edges
-    _, _, ibins = stats.binned_statistic_dd(coors, energy, 
-                                            bins = bins, statistic = 'count',
-                                            expand_binnumbers = True)   
-    ibins = [b-1 for b in ibins]
-    ref     = 1000
-    indices =  ref * ibins[1] + ibins[0]
+    ndim      = len(coors)
+    bin_edges = krmap.bin_edges
+    
+    idx = [np.digitize(coors[i], bin_edges[i])-1          for i in range(ndim)]
+    sel = [(idx[i] >= 0) & (idx[i] < len(bin_edges[i])-1) for i in range(ndim)]
+    sel = np.logical_and(*sel) if ndim >1 else sel[0]
 
-
+    idx    = tuple([idx[i][sel] for i in range(ndim)])
+    dt     = dtime[sel]
+    ene    = energy[sel] 
+    
     eref   = krmap.eref
-    dtref  = krmap.dtref
     dedt   = krmap.dedt
+    dtref  = krmap.dtref 
+    mask   = krmap.success if mask == None else mask
     
-    mask   = krmap.success if mask is None else mask
+    eref[~mask] = np.nan
     
-    corr_energy = np.ones(len(energy)) * np.nan
-    
-    for i0, i1 in np.argwhere(mask == True):
-        ijsel = indices == int(ref * i1 + i0)
-        ts, enes = dtime[ijsel], energy[ijsel]
-        par = eref[i0, i1], dedt[i0, i1]
-        tij = dtref[i0, i1]
-        st_fun = lambda ts, a, b : a - b * (ts - tij)
-        cenes = st_fun(ts, *par)
-        
-        corr_energy[ijsel] = scale * enes / cenes
+    eref   = eref[idx]
+    dedt   = dedt[idx]
+    dtref  = dtref[idx]
 
-    return corr_energy  
+    vals   = scale * ene / (eref - dedt * (dt - dtref)) 
+    
+    cene   = np.nan * np.ones(len(energy))
+    cene[sel == True] = vals
+
+    return cene
+
+
+# def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
+    
+#     # TODO: improve!
+    
+#     bins = krmap.bin_edges
+#     _, _, ibins = stats.binned_statistic_dd(coors, energy, 
+#                                             bins = bins, statistic = 'count',
+#                                             expand_binnumbers = True)   
+#     ibins = [b-1 for b in ibins]
+#     ref     = 1000
+#     indices =  ref * ibins[1] + ibins[0]
+
+
+#     eref   = krmap.eref
+#     dtref  = krmap.dtref
+#     dedt   = krmap.dedt
+    
+#     mask   = krmap.success if mask is None else mask
+    
+#     corr_energy = np.ones(len(energy)) * np.nan
+    
+#     for i0, i1 in np.argwhere(mask == True):
+#         ijsel = indices == int(ref * i1 + i0)
+#         ts, enes = dtime[ijsel], energy[ijsel]
+#         par = eref[i0, i1], dedt[i0, i1]
+#         tij = dtref[i0, i1]
+#         st_fun = lambda ts, a, b : a - b * (ts - tij)
+#         cenes = st_fun(ts, *par)
+        
+#         corr_energy[ijsel] = scale * enes / cenes
+
+#     return corr_energy  
 
 
 #--- Save and Load into/from h5
