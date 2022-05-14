@@ -116,10 +116,12 @@ def residuals_(ts, es, par, cov):
     return res, sig, sigma 
 
 
-KrMap = namedtuple('KrMap', 
-                   ('counts', 'eref', 'dedt', 'dtref', 'ueref', 'udedt', 'cov',
-                    'chi2', 'pvalue', 'sigma', 'success',
-                    'bin_centers', 'bin_edges', 'bin_indices', 'residuals'))
+krmap_names = ('counts', 'eref', 'dedt', 'dtref', 'ueref', 'udedt', 'cov',
+               'chi2', 'pvalue', 'sigma', 'success',
+               'bin_centers', 'bin_edges')
+
+KrMap = namedtuple('KrMap', krmap_names)
+
 
 def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
     
@@ -169,14 +171,18 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
         pval  [i0, i1] = ijpval
         sig   [i0, i1] = ijsig
         
-    return KrMap(counts, eref, dedt, dtref, ueref, udedt, cov,
-                 chi2, pval, sig, success,
-                 cbins, ebins, ibins, 
-                 residuals)
+        
+    ikrmap = KrMap(counts, eref, dedt, dtref, ueref, udedt, cov,
+                   chi2, pval, sig, success,
+                   cbins, ebins)
+    
+    return ikrmap, residuals
 
 
 
 def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
+    
+    # TODO: improve!
     
     bins = krmap.bin_edges
     _, _, ibins = stats.binned_statistic_dd(coors, energy, 
@@ -205,62 +211,16 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
         
         corr_energy[ijsel] = scale * enes / cenes
 
-    return corr_energy, ibins    
+    return corr_energy  
 
 
 #--- Save and Load into/from h5
-
-_type_names           = {}
-_type_names['KrMap']  = ('counts', 'eref', 'dedt', 'dtref', 'ueref',
-                        'udedt', 'cov', 'chi2', 'pvalue', 'sigma', 'success')
-_type_names['Profile'] = ('counts', 'mean', 'std', 'chi2', 'pvalue', 'success')
-
-_type            = {}
-_type['KrMap']   = KrMap
-_type['Profile'] = prof.Profile
     
 
-def krmap_save(krmap, key, ofile):
-    
-    maptype = 'KrMap' if isinstance(krmap, KrMap) else 'Profile'
-    
-    names = _type_names[maptype]            
+save = prof.save
 
-    odf = {}
-    for name in names: odf[name] = getattr(krmap, name).ravel()
+load = lambda key, ifile : prof.load(key, ifile, KrMap)
 
-    mesh = np.meshgrid(*krmap.bin_centers)
-    odf['x'] = mesh[0].ravel()
-    odf['y'] = mesh[1].ravel()
-    
-    odf = pd.DataFrame(odf)
-    
-    obins = {0: krmap.bin_edges[0], 1: krmap.bin_edges[1]}
-    obins = pd.DataFrame(obins)
-    
-    odf  .to_hdf(ofile, key = key + '/krmap', mode = 'a')
-    obins.to_hdf(ofile, key = key + '/bins' , mode = 'a')
-    
-    return odf, obins
-
-def krmap_read(key, ifile = './krmap_test.h5', maptype = 'KrMap'):
-    
-    idf   = pd.read_hdf(ifile, key = key + '/krmap')
-    ibins = pd.read_hdf(ifile, key = key + '/bins')
-    
-    bin_edges   = ibins[0].values, ibins[1].values
-    bin_centers = [0.5*(b[1:] + b[:-1]) for b in bin_edges]
-    residuals   = None
-    bin_indices = None
-    
-    shape  = len(ibins[0])-1, len(ibins[1])-1
-    names  = _type_names[maptype]
-    vars   = [idf[name].values.reshape(shape) for name in names]
-    _itype = _type[maptype]
-    
-    xmap = _itype(*vars, bin_centers, bin_edges, bin_indices, residuals)
-    return xmap
-    
 
 #---- Accept Residuals
 
@@ -420,11 +380,11 @@ def plot_xyvar(var, bins = None, title = '', mask = None, nbins = 100):
 
 
 def plot_xydt_energy_profiles(xdf, nbins = 100):
-    zprof  = prof.profile((xdf.dtime,), xdf.energy, nbins)
+    zprof, _  = prof.profile((xdf.dtime,), xdf.energy, nbins)
     prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = ('dtime',))
-    xprof  = prof.profile((xdf.x,), xdf.energy, nbins)
+    xprof, _  = prof.profile((xdf.x,), xdf.energy, nbins)
     prof.plot_profile(xprof, nbins = nbins, stats = ('mean',), coornames = ('x',))
-    yprof  = prof.profile((xdf.y,), xdf.energy, nbins)
+    yprof, _  = prof.profile((xdf.y,), xdf.energy, nbins)
     prof.plot_profile(yprof, nbins = nbins, stats = ('mean',), coornames = ('y',))
     return
     
