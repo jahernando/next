@@ -225,9 +225,10 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     ndim      = len(coors)
     bin_edges = krmap.bin_edges
     
-    idx = [np.digitize(coors[i], bin_edges[i])-1          for i in range(ndim)]
-    sel = [(idx[i] >= 0) & (idx[i] < len(bin_edges[i])-1) for i in range(ndim)]
-    sel = np.logical_and(*sel) if ndim >1 else sel[0]
+    idx  = [np.digitize(coors[i], bin_edges[i])-1          for i in range(ndim)]
+    sels = [(idx[i] >= 0) & (idx[i] < len(bin_edges[i])-1) for i in range(ndim)]
+    sel  = sels[0]
+    for isel in sels[1:]: sel = np.logical_and(sel, isel)
 
     idx    = tuple([idx[i][sel] for i in range(ndim)])
     dt     = dtime[sel]
@@ -400,6 +401,6 @@ def plot_xyvar(var, bins = None, title = '', mask = None, nbins = 100):
 def plot_xydt_energy_profiles(xdf, nbins = 100, names = ('dtime', 'x', 'y')):
     for name in names:
         zprof, _  = prof.profile((xdf[name],), xdf.energy, nbins)
-        prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = ('name',))
+        prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = (name,))
     return
     
