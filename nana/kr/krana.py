@@ -100,7 +100,8 @@ def experiments(generate, fun, e0 = e0, tau0 = tau0, mexps = 1000, size = 100):
         rs.append((r[0], r[1])) 
     return rs
 
-#  Kr maps from fitting
+#---------------------------------
+#  KrMap
 #-----------------------------------
 
 def residuals_(ts, es, par, cov):
@@ -124,8 +125,27 @@ KrMap = namedtuple('KrMap', krmap_names)
 
 
 def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
+    """
     
-    
+    Construct a Kr Map
+
+    Parameters
+    ----------
+    coors      : tuple(np.array), tuple with the coordinates (x, y)
+    dtime      : np.array, drift time
+    energy     : np.array, energy
+    bins       : int, tuple, bins of the krmap, default (36, 36)
+    counts_min : int, minimum counts in each coordinate bin to compute the parameters of the map
+    dt0        : float or None, reference value of the drift-time if None, 
+            it compute the mean value of each coordinate bin.
+
+    Returns
+    -------
+    krmap     : krMap, krmap object
+    residuals : np.array, normalized residuals
+
+    """
+        
     counts, ebins, ibins = stats.binned_statistic_dd(coors, energy, 
                                                      bins = bins, statistic = 'count',
                                                      expand_binnumbers = True)    
@@ -182,6 +202,24 @@ def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
 
 
 def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
+    """
+    
+    correct the energy at a given drift-time by a Krmap
+
+    Parameters
+    ----------
+    coors  : tuple(np.array), tuple with the coordinates, (x, y)
+    dtime  : np.array, drift-times
+    energy : np.array, energy
+    krmap  : KrMap, krmap object used for the correction
+    scale  : float, value to scale, default 1.
+    mask   : np.array, shape as the krmap shape, mask given bins of the krmap, default None
+
+    Returns
+    -------
+    cene    : np.array, corrected energy
+
+    """
     
     
     ndim      = len(coors)
@@ -213,39 +251,6 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
 
     return cene
 
-
-# def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
-    
-#     # TODO: improve!
-    
-#     bins = krmap.bin_edges
-#     _, _, ibins = stats.binned_statistic_dd(coors, energy, 
-#                                             bins = bins, statistic = 'count',
-#                                             expand_binnumbers = True)   
-#     ibins = [b-1 for b in ibins]
-#     ref     = 1000
-#     indices =  ref * ibins[1] + ibins[0]
-
-
-#     eref   = krmap.eref
-#     dtref  = krmap.dtref
-#     dedt   = krmap.dedt
-    
-#     mask   = krmap.success if mask is None else mask
-    
-#     corr_energy = np.ones(len(energy)) * np.nan
-    
-#     for i0, i1 in np.argwhere(mask == True):
-#         ijsel = indices == int(ref * i1 + i0)
-#         ts, enes = dtime[ijsel], energy[ijsel]
-#         par = eref[i0, i1], dedt[i0, i1]
-#         tij = dtref[i0, i1]
-#         st_fun = lambda ts, a, b : a - b * (ts - tij)
-#         cenes = st_fun(ts, *par)
-        
-#         corr_energy[ijsel] = scale * enes / cenes
-
-#     return corr_energy  
 
 
 #--- Save and Load into/from h5
@@ -289,27 +294,6 @@ def accept_residuals(residuals,
     return done, sel
 
 
-# def _accept_residuals(krmap, max_sigma = 3.4):
-#     xsel = ~np.isnan(krmap.residuals)
-#     canvas = pltext.canvas(2, 2)
-#     canvas(1)
-#     pltext.hist(krmap.residuals[xsel], 100);
-#     plt.yscale('log');
-#     plt.xlabel('normalized residuals');
-#     canvas(2)
-#     cc = pltext.hfit(krmap.residuals[xsel], 100, range = (-1.5, 1.5), fun = 'gaus');
-#     pars = cc[3]
-#     sigma = pars[2]
-#     print('sigma ', sigma)
-#     plt.yscale('log'); plt.ylim((1, 1e5));
-#     plt.xlabel('normalized residuals');
-#     plt.show()
-#     sigma  = 3.5 * sigma 
-#     #sigma = input('sigma of the accepted residuals (>=5 (all)) ')
-#     done  = sigma > max_sigma
-#     print('done ', done)
-#     sel   = xsel if done else np.abs(krmap.residuals) <= 3.5 * sigma
-#     return done, sel
 
 #--- Plotting
 
@@ -413,12 +397,9 @@ def plot_xyvar(var, bins = None, title = '', mask = None, nbins = 100):
     return
 
 
-def plot_xydt_energy_profiles(xdf, nbins = 100):
-    zprof, _  = prof.profile((xdf.dtime,), xdf.energy, nbins)
-    prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = ('dtime',))
-    xprof, _  = prof.profile((xdf.x,), xdf.energy, nbins)
-    prof.plot_profile(xprof, nbins = nbins, stats = ('mean',), coornames = ('x',))
-    yprof, _  = prof.profile((xdf.y,), xdf.energy, nbins)
-    prof.plot_profile(yprof, nbins = nbins, stats = ('mean',), coornames = ('y',))
+def plot_xydt_energy_profiles(xdf, nbins = 100, names = ('dtime', 'x', 'y')):
+    for name in names:
+        zprof, _  = prof.profile((xdf[name],), xdf.energy, nbins)
+        prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = ('name',))
     return
     
