@@ -253,6 +253,61 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     return cene
 
 
+def krmap_dtimescale(coors, dtime, krmap, scale = 1., mask = None):
+    """
+    
+    correct the energy at a given drift-time by a Krmap
+
+    Parameters
+    ----------
+    coors  : tuple(np.array), tuple with the coordinates, (x, y)
+    dtime  : np.array, drift-times
+    energy : np.array, energy
+    krmap  : KrMap, krmap object used for the correction
+    scale  : float, value to scale, default 1.
+    mask   : np.array, shape as the krmap shape, mask given bins of the krmap, default None
+
+    Returns
+    -------
+    cene    : np.array, corrected energy
+
+    """
+    
+    
+    ndim      = len(coors)
+    bin_edges = krmap.bin_edges
+    
+    idx  = [np.digitize(coors[i], bin_edges[i])-1          for i in range(ndim)]
+    sels = [(idx[i] >= 0) & (idx[i] < len(bin_edges[i])-1) for i in range(ndim)]
+    sel  = sels[0]
+    for isel in sels[1:]: sel = np.logical_and(sel, isel)
+
+    idx    = tuple([idx[i][sel] for i in range(ndim)])
+    dt     = dtime[sel]
+    #ene    = energy[sel] 
+    
+    eref   = krmap.eref
+    dedt   = krmap.dedt
+    dtref  = krmap.dtref 
+    mask   = krmap.success if mask == None else mask
+    
+    eref[~mask] = np.nan
+    
+    eref   = eref[idx]
+    dedt   = dedt[idx]
+    dtref  = dtref[idx]
+    
+    invtau = dedt/eref
+
+    vals   = scale / (1. - invtau * (dt - dtref)) 
+    
+    cfactor  = np.nan * np.ones(len(dtime))
+    cfactor[sel == True] = vals
+
+    return cfactor
+
+
+
 
 #--- Save and Load into/from h5
     
