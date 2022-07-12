@@ -29,7 +29,7 @@ import networkx         as nx
 import invisible_cities.io.dst_io as dio
 
 
-
+# NEW Double Escape
 datadir   = "/Users/hernando/work/investigacion/NEXT/data/MC/NEW/ds/"
 filenames = ("Tl208_NEW_v1_03_01_nexus_v5_03_04_cut24.beersheba_label_4mm_fid_v0.h5", 
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut25.beersheba_label_4mm_fid_v0.h5")
@@ -39,7 +39,11 @@ filenames = ("Tl208_NEW_v1_03_01_nexus_v5_03_04_cut50.beersheba_label_4mm.h5",
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut52.beersheba_label_4mm.h5",
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut53.beersheba_label_4mm.h5",
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut54.beersheba_label_4mm.h5")
-             
+
+# NEXT-100 bb
+datadir   = "/Users/hernando/work/investigacion/NEXT/data/NEXT100/bb0nu/v1/"
+filenames = ("label_beersheba_554mm_0nubb.h5",) 
+
 
 filenames = [datadir+file for file in filenames]
 
@@ -69,7 +73,7 @@ def get_dfs(filename):
     dfs = {}
     
     dfs['rcvoxels'] = dio.load_dst(filename, 'DATASET', 'BeershebaVoxels')
-    dfs['mcvoxels'] = dio.load_dst(filename, 'DATASET', 'MCVoxels')
+    #dfs['mcvoxels'] = dio.load_dst(filename, 'DATASET', 'MCVoxels')
     dfs['mchits']   = dio.load_dst(filename, 'DATASET', 'MCHits')
     dfs['events']   = dio.load_dst(filename, 'DATASET', 'EventsInfo')
     dfs['bins']     = dio.load_dst(filename, 'DATASET', 'BinsInfo')
@@ -389,6 +393,14 @@ def nodes_frame(clouds):
     df['evtene']   = np.sum(enes) * np.ones(nnodes, float)
     df['evtnodes'] = nnodes       * np.ones(nnodes, int)
     
+    x = clouds.x0[nodes]
+    y = clouds.x1[nodes]
+    z = clouds.x2[nodes]
+    df['xnode'] = x
+    df['ynode'] = y
+    df['znode'] = z
+    df['rnode'] = [np.sqrt(xi**2 + yi**2) for xi, yi in zip(x, y)]
+    
     df = pd.DataFrame(df)
     df.set_index('node')
     return df
@@ -431,8 +443,8 @@ def nodes_frame_extend_label(fnodes, clouds):
         return s
     
     nodes = fnodes.node
-    scell = [         clouds.segclass[clouds.enode == node]  for node in nodes]
-    sseg  = [_seg    (clouds.segclass[clouds.enode == node])  for node in nodes]
+    scell = [     int(clouds.segclass[clouds.kid    == node])  for node in nodes]
+    sseg  = [_seg    (clouds.segclass[clouds.enode  == node]) for node in nodes]
     sext  = [_extreme(clouds.mcextreme[clouds.enode == node]) for node in nodes]
     
     fnodes['segcell']     = scell
