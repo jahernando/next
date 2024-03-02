@@ -20,6 +20,10 @@ import hipy.histos       as histos
 import hipy.pltext       as pltext
 import hipy.profile      as prof
 
+#-------------------
+#  Data Generator
+#-------------------
+
 # parameters
 size                    = 100
 length, width           = 100., 100.
@@ -30,7 +34,7 @@ def generate_kr_toy(size = 100000,
                     length = length,
                     width = length,
                     e0 = e0,
-                    tau = tau0,
+                    tau = 10*length,
                     beta = beta,
                     sigma = sigma,
                     x0 = 0.,
@@ -40,22 +44,24 @@ def generate_kr_toy(size = 100000,
 
     Inputs:
         size    : (int)    size of the sample
-        length  : (float)  length of the chamber
-        width   : (float)  witdh of the chamber
-        e0      : (float)  energy at zero drift-time  
+        length  : (float)  length of the chamber (mm)
+        width   : (float)  witdh of the chamber (mm)
+        e0      : (float)  energy at zero drift-time  (keV)
         tau     : (float)  life-time in (mm)
         beta    : (float)  radial distortion (parabolic)
         sigma   : (float)  (%) of the fluctiation of e0
         x0      : (float)  displacement respect the origin, x-coordinate
         y0      : (float)  displacement respect the origin, y-coordinate
 
-
+    Returns:
+        df      : (DataFrame) ['x', 'y', 'dtime', 'r', 'phi', 'energy']
     """
     
     ts = stats.uniform.rvs(0, length, size = size)
     xs = stats.uniform.rvs(0, width, size = size) - 0.5 * width
     ys = stats.uniform.rvs(0, width, size = size) - 0.5 * width
-    es = (1. - tau * ts/length) * stats.norm.rvs(loc = e0, scale = e0 * sigma, size = size)
+    es  = np.exp(-ts/tau) * stats.norm.rvs(loc = e0, scale = e0 * sigma, size = size)
+    #es = (1. - ts/tau) * stats.norm.rvs(loc = e0, scale = e0 * sigma, size = size)
     r0s = np.sqrt((xs - x0)** 2 + (ys - y0)** 2)
     er = es * (1 - beta * (2 * r0s / width) ** 2)
 
@@ -68,274 +74,221 @@ def generate_kr_toy(size = 100000,
           'r'     : rs[sel],
           'phi'   : np.arcsin(xs[sel]/rs[sel]),
           'energy': er[sel]}
+    
     return pd.DataFrame(df)
                                
 
-#   Testing generation of LT and Fitting
-#-------------------------------------------
-
-def generate_toy(size, e0 = e0, tau0 = tau0, length = length, 
-                 sigma_ref = 0.04):
-    """ simple LT """
-    
-    ts = length * stats.uniform.rvs(size = size)
-    es  = e0 * ((1 - ts/tau0) + sigma_ref * stats.norm.rvs(size = size))
-    return ts, es
-
-@np.vectorize
-def attachment(t, lifetime, n_ie):
-    return np.count_nonzero(-lifetime * np.log(np.random.uniform(size=int(n_ie))) > t)
-
-
-def generate_toy_att(size = size, e0 = e0, tau0 = tau0, length = length, wi = wi):
-    """ Binomial LT """
-    nie0     = e0/wi
-    tis      = length * stats.uniform.rvs(size = size)
-    nies     = stats.poisson.rvs(nie0, size = size)
-    nis      = attachment(tis, tau0, nies)
-    eis      = e0 * nis/nie0
-    return tis, eis
-
-
-def generate_toy_bin(size = size, e0 = e0, tau0 = tau0, length = length, wi = wi):
-    """ Binomial LT """
-    nie0     = e0/wi
-    tis      = length * stats.uniform.rvs(size = size)
-    nies     = stats.poisson.rvs(nie0, size = size)
-    ps       = 1 - tis/tau0
-    nks      = stats.binom.rvs(nies, ps) * wi 
-    return tis, nks
-
-
-st_ipar = lambda t, a, b : a - b * t
-st_cpar = lambda t, a, b : a * (1 - t / b) 
-st_imed = lambda t, a, b : a - b * (t - length/2)
-
-
-def experiments(generate, fun, e0 = e0, tau0 = tau0, mexps = 1000, size = 100):
-    """ generate experiments fit and return result of the fit """
-    rs    = []
-    for i in range(mexps):
-        ts, es = generate(size = size, e0 = e0, tau0 = tau0)
-        r      = optimize.curve_fit(fun, ts, es)
-        #chi2   = chisq(fun, ts, es, r[0])
-        rs.append((r[0], r[1])) 
-    return rs
-
 #---------------------------------
-#  KrMap
+#  KrMap creator
 #-----------------------------------
 
-def residuals_(ts, es, par, cov):
-    
-    xv    = np.ones(shape = (2, len(ts)))
-    xv[1] = -ts
-    res   = np.dot(par, xv) - es
 
-    var   = np.sum(xv * np.matmul(cov, xv), axis = 0)
-    sig   = np.sqrt(var)
-    
-    sigma = np.sqrt(np.sum(res * res)/ (len(ts) - 2))
-    return res, sig, sigma 
+def residuals_fun(fun, xs, ys, pars):
+    """ compute the residuals of ys - fun(xs, *pars)
 
+    Inputs:
+        fun  : (function) fun(xs, *pars) i.e for straight line fun(xs, a, b) =  a + b * xs
+        xs   : (np.array) x values
+        ys   : (np.array) y values
+        pars : (np.array) parameter values, arguments of the function  
 
-krmap_names = ('counts', 'eref', 'dedt', 'dtref', 'ueref', 'udedt', 'cov',
-               'chi2', 'pvalue', 'sigma', 'success',
-               'bin_centers', 'bin_edges')
-
-KrMap = namedtuple('KrMap', krmap_names)
-
-eltkrmap_names = ('counts', 'eref', 'elt', 'ueref', 'uelt', 'cov',
-                 'chi2', 'pvalue', 'sigma', 'success',
-                 'bin_centers', 'bin_edges')
-
-ELTKrMap = namedtuple('ELKrMap', eltkrmap_names)
-
-
-
-def krmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, dt0 = None):
+    Returns:
+        res   : (np.array) residuals ys - fun(xs, *pars)
+        sigma : (float)    std of the residuals
+        chi2  : (float)    chi2/ndf of the residuals
     """
+
+    vals  = fun(xs, *pars)
+    res   = vals - ys
+    nsize = len(res)
+    sigma = np.sqrt(np.sum(res*res)/(nsize-1))
+    chi2  = (np.sum(res * res)/(sigma**2))/(nsize-2)
+
+    return res, sigma, chi2
+
+krmap_fields = ('counts', 'e0', 'lt', 'ue0', 'ult', 'cov',
+                'chi2', 'pvalue', 'sigma', 'success',
+                'coordenates', 'kr_fit_type',
+                'bin_centers', 'bin_edges')
+
+def sline_to_exp(par, var):
+    opar = np.array((par[0], par[0]/par[1]))
+    return (opar, var)
+
+def loge_to_exp(par, var):
+    opar = np.array((np.exp(par[0]), par[1]))
+    return (opar, var)
+
+KrFitType = namedtuple('KrFitType', ('par_names', 'function', 'input_data', 'output_pars'))
+
+krfit_exp = KrFitType(('e0', 'lt'), 
+                      lambda ts, a, b: a* np.exp(-ts/b), 
+                      lambda ts, es: (ts, es),
+                      lambda par, var: (par,var))
+
+krfit_sline = KrFitType(('eref', 'dedt'), lambda ts, a, b: a - b * ts, 
+                      lambda ts, es: (ts, es), sline_to_exp)
+
+krfit_elog = KrFitType(('loge', 'lt'), lambda ts, a, b: a - ts/b, 
+                      lambda ts, es: (ts, np.log(es)), loge_to_exp)
+
+krfit_dict_ = {'exp'   : krfit_exp, 
+               'sline' : krfit_sline,
+               'loge'  : krfit_elog}
+
+
+def get_coors(df, coordenates):
+
+    if (coordenates not in ['cartesian', 'polar']):
+        raise("Not valid type of coordinates " + coordenates)
     
-    Construct a Kr Map
+    coors = (df.x, df.y)
+    if (coordenates == 'polar'): coors = (df.r, df.phi)
 
-    Parameters
-    ----------
-    coors      : tuple(np.array), tuple with the coordinates (x, y)
-    dtime      : np.array, drift time
-    energy     : np.array, energy
-    bins       : int, tuple, bins of the krmap, default (36, 36)
-    counts_min : int, minimum counts in each coordinate bin to compute the parameters of the map
-    dt0        : float or None, reference value of the drift-time if None, 
-            it compute the mean value of each coordinate bin.
+    return coors
 
-    Returns
-    -------
-    krmap     : krMap, krmap object
-    residuals : np.array, normalized residuals
 
+def configure_krmap_creator(coordenates, bins, counts_min, kr_fit_type):
+    """ Return the function that creates a KrMap for a given fit type
+
+    Inputs:
+        counts_min   : (int) minimum number of counts required to fit
+        kr_fit_type  : (str) name of the kr fit, i. ('exp', 'loge', 'sline')
+
+    Outputs:
+        krmap_creator : (function) creates the krmap 
     """
-        
-    counts, ebins, ibins = stats.binned_statistic_dd(coors, energy, 
-                                                     bins = bins, statistic = 'count',
-                                                     expand_binnumbers = True)    
-    ibins = [b-1 for b in ibins]
-    cbins = [0.5 * (x[1:] + x[:-1]) for x in ebins]
 
-    ref     = 1000
-    indices =  ref * ibins[1] + ibins[0]
-    #indices0 = np.array([ref * i1 + i0 for i0 in range(bins[0]) for i1 in range(bins[1])], int)
-
-    eref  = np.zeros(shape = counts.shape)
-    dedt  = np.zeros(shape = counts.shape)
-    dtref = np.zeros(shape = counts.shape)
-    ueref = np.zeros(shape = counts.shape)
-    udedt = np.zeros(shape = counts.shape)
-    cov   = np.zeros(shape = counts.shape)
-    chi2  = np.zeros(shape = counts.shape)
-    sig   = np.zeros(shape = counts.shape)
-    pval  = np.zeros(shape = counts.shape)
+    if (kr_fit_type not in krfit_dict_.keys()):
+        raise("Input not valid: type of Kr fit not accepted " + kr_fit_type)
     
-    success   = counts > counts_min  
-    residuals = np.nan * np.ones(len(energy))
+    krfit   = krfit_dict_[kr_fit_type]
+    npars   = len(krfit.par_names)
+    parname = lambda i    : 'par_'+str(i) # parnames_[i]
+    covname = lambda i, j : 'cov_'+str(i)+str(j) # parnames_[i]+'_'+parnames_[j]
+    names   = list(krmap_fields)
+    names   += [parname(i) for i in range(npars)]
+    names   += [covname(i, j) for i in range(npars) for j in range(i+1, npars)]
+
+    KrMapX = namedtuple('KrMapX', names)
+
+    def krmap_creator(df):
+        """
+        Constructs a KrMap
+
+        Inputs
+            df  : (pd.DataFrame) ['x', 'y', 'dtime', 'energy', 'r', 'phy']
+        Returns
+            krmap     : (NamedTuple) see krmap_fields for the attributes of this named tuple
+            residuals : (np.array), normalized residuals, same size (as coordinates)
+        """
+
+        coors  = get_coors(df, coordenates)
+        dtime  = df.dtime
+        energy = df.energy
+        return krmap_creator_base(coors, bins, dtime, energy)
+
+    # configurate the map creator function
+    def krmap_creator_base(coors, bins, dtime, energy):
+        """
+        Constructs a KrMap
+
+        Inputs
+            coors      : (tuple(np.array)), tuple with the coordinates i.e (x, y)
+            bins       : (int, tuple, or bins) i.e (20, 20), or ([0, 1., 2, 3], 1)
+            dtime      : (np.array), drift time
+            energy     : (np.array), energy
+
+        Returns
+            krmap     : (NamedTuple) see krmap_fields for the attributes of this named tuple
+            residuals : (np.array), normalized residuals, same size (as coordinates)
+        """
+
+        counts, ebins, ibins = stats.binned_statistic_dd(coors, energy, 
+                                                         bins = bins, statistic = 'count',
+                                                         expand_binnumbers = True)    
+        ibins = [b-1 for b in ibins]
+        cbins = [0.5 * (x[1:] + x[:-1]) for x in ebins]
+
+        ref     =  1000 
+        if (len(ibins[0]) > ref): ref = 10 * len(ibins[0])
+
+        indices =  ref * ibins[1] + ibins[0]
+        #indices0 = np.array([ref * i1 + i0 for i0 in range(bins[0]) for i1 in range(bins[1])], int)
+
+        dmap = {}
+        for name in names: dmap[name] = np.zeros(shape = counts.shape)
+        residuals = np.nan * np.ones(len(energy))
     
-    for i0, i1 in np.argwhere(success == True):
-        ijsel = indices == int(ref * i1 + i0)
-        ts, enes = dtime[ijsel], energy[ijsel]
-        #print(len(ts), len(enes), counts[i0, i1], np.sum(ijsel))
-        tij = np.mean(ts) if dt0 is None else dt0
-        fun = lambda ts, a, b : a - b * (ts - tij)
-        par, var = optimize.curve_fit(fun, ts, enes)
-        eref [i0, i1] = par[0]
-        dedt [i0, i1] = par[1]
-        dtref[i0, i1] = tij
-        ueref[i0, i1] = np.sqrt(var[0, 0])
-        udedt[i0, i1] = np.sqrt(var[1, 1])
-        cov  [i0, i1] = var[0, 1]
-        
-        #res, _ , ijsig = residuals_(ts - tij, enes, par, var)
-        res, ijsig = residuals_fun(fun, ts, enes, par)
-        residuals[ijsel] = res/ijsig
-        #ijchi2 = np.sum(res * res)/(len(res) - 2)
-        ijchi2 = (np.sum(res * res)/(ijsig**2))/(len(res)-2)
-        ijpval = stats.shapiro(res)[1] if (len(res) > 3) else 0.
-        chi2  [i0, i1] = ijchi2
-        pval  [i0, i1] = ijpval
-        sig   [i0, i1] = ijsig
-        
-        
-    krmap = KrMap(counts, eref, dedt, dtref, ueref, udedt, cov,
-                   chi2, pval, sig, success,
-                   cbins, ebins)
-        
-    return krmap, residuals
-
-
-def residuals_fun(fun, ts, es, par):
-
-    vals = fun(ts, *par)
-    res = vals - es
-    sigma = np.sqrt(np.sum(res*res)/(len(res)-1))
-    return res, sigma
-
-def eltkrmap(coors, dtime, energy, bins = (36, 36), counts_min = 40, fitype = "loge"):
-    """
+        success = counts > counts_min
+        dmap['success']  = success
+        dmap['counts']   = counts
     
-    Construct a Kr Map using a fitype
+        for i0, i1 in np.argwhere(success == True):
+            
+            sel = indices == int(ref * i1 + i0)
+            ts, enes = dtime[sel], energy[sel]
+            xs, ys   = krfit.input_data(ts, enes) 
 
-    Parameters
-    ----------
-    coors      : tuple(np.array), tuple with the coordinates (x, y)
-    dtime      : np.array, drift time
-    energy     : np.array, energy
-    bins       : int, tuple, bins of the krmap, default (36, 36)
-    counts_min : int, minimum counts in each coordinate bin to compute the parameters of the map
-    fittype    : str with the fit type
+            ipar, ivar = optimize.curve_fit(krfit.function, xs, ys)
+            opar, ovar = krfit.output_pars(ipar, ivar)
+            
+            dmap['e0'] [i0, i1] = opar[0]
+            dmap['lt' ][i0, i1] = opar[1]
+            dmap['ue0'][i0, i1] = np.sqrt(ovar[0, 0])
+            dmap['ult'][i0, i1] = np.sqrt(ovar[1, 1])
+            dmap['cov'][i0, i1] = ovar[0, 1]
 
-    Returns
-    -------
-    krmap     : krMap, krmap object
-    residuals : np.array, normalized residuals
-
-    """
+            for i in range(npars): 
+                dmap[parname(i)][i0, i1] = ipar[i]
+            for i in range(npars):
+                for j in range(i+1, npars):
+                    dmap[covname(i, j)][i0, i1] = ivar[i, j]
         
-    counts, ebins, ibins = stats.binned_statistic_dd(coors, energy, 
-                                                     bins = bins, statistic = 'count',
-                                                     expand_binnumbers = True)    
-    ibins = [b-1 for b in ibins]
-    cbins = [0.5 * (x[1:] + x[:-1]) for x in ebins]
+            res, sigma, chi2 = residuals_fun(krfit.function, xs, ys, ipar)
+            pval             = stats.shapiro(res)[1] if (len(res) > 3) else 0.
+            dmap['chi2']  [i0, i1] = chi2
+            dmap['pvalue'][i0, i1] = pval
+            dmap['sigma'] [i0, i1] = sigma
+            residuals[sel]         = res/sigma
 
-    ref     =  1000 
-    if (len(ibins[0]) > ref): ref = 10 * len(ibins[0])
-
-    indices =  ref * ibins[1] + ibins[0]
-    #indices0 = np.array([ref * i1 + i0 for i0 in range(bins[0]) for i1 in range(bins[1])], int)
-
-    eref  = np.zeros(shape = counts.shape)
-    elt   = np.zeros(shape = counts.shape)
-    ueref = np.zeros(shape = counts.shape)
-    uelt  = np.zeros(shape = counts.shape)
-    udedt = np.zeros(shape = counts.shape)
-    cov   = np.zeros(shape = counts.shape)
-    chi2  = np.zeros(shape = counts.shape)
-    sig   = np.zeros(shape = counts.shape)
-    pval  = np.zeros(shape = counts.shape)
+        dmap['coordenates'] = coordenates
+        dmap['kr_fit_type'] = kr_fit_type
+        dmap['bin_centers'] = cbins
+        dmap['bin_edges']   = ebins        
     
-    success   = counts > counts_min  
-    residuals = np.nan * np.ones(len(energy))
+        krmap = KrMapX(**dmap)
+        return krmap, residuals
     
-    for i0, i1 in np.argwhere(success == True):
-        ijsel = indices == int(ref * i1 + i0)
-        ts, enes = dtime[ijsel], energy[ijsel]
-        #print(len(ts), len(enes), counts[i0, i1], np.sum(ijsel))
-        # tij = np.mean(ts) if dt0 is None else dt0
-        # st_fun = lambda ts, a, b : a - b * (ts - tij)
-        fun = lambda ts, a, b : a - ts/b
-        par, var = optimize.curve_fit(fun, ts, np.log(enes))
-        eref [i0, i1] = np.exp(par[0])
-        elt  [i0, i1] = par[1]
-#        dtref[i0, i1] = tij
-        ueref[i0, i1] = np.sqrt(var[0, 0])
-        uelt[i0, i1]  = np.sqrt(var[1, 1])
-        cov  [i0, i1] = var[0, 1]
-        
-        res, ijsig = residuals_fun(fun, ts, np.log(enes), par)
-        residuals[ijsel] = res/ijsig
-        ijchi2 = (np.sum(res * res)/(ijsig**2))/(len(res)-2)
-        ijpval = stats.shapiro(res)[1] if (len(res) > 3) else 0.
-        chi2  [i0, i1] = ijchi2
-        pval  [i0, i1] = ijpval
-        sig   [i0, i1] = ijsig
-        
-    krmap = ELTKrMap(counts, eref, elt, ueref, uelt, cov,
-                      chi2, pval, sig, success,
-                      cbins, ebins)
-    
-    return krmap, residuals
-
-#----- Corrections
+    # returns the configurated map creator function
+    return krmap_creator
 
 
-def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
+#-----------------
+#  Correction
+#------------------
+
+def krmap_scale_(df, krmap, scale = 1., mask = None):
     """
     
     correct the energy at a given drift-time by a Krmap
 
-    Parameters
-    ----------
-    coors  : tuple(np.array), tuple with the coordinates, (x, y)
-    dtime  : np.array, drift-times
-    energy : np.array, energy
-    krmap  : KrMap, krmap object used for the correction
-    scale  : float, value to scale, default 1.
-    mask   : np.array, shape as the krmap shape, mask given bins of the krmap, default None
+    Inputs:
+        coors  : tuple(np.array), tuple with the coordinates, i.e (x, y)
+        dtime  : np.array, drift-times
+        energy : np.array, energy
+        krmap  : KrMap, named tuple
+        scale  : float, value to scale, default 1.
+        mask   : np.array, shape as the krmap shape, mask given bins of the krmap, default None
 
-    Returns
-    -------
-    cene    : np.array, corrected energy
-
+    Output:
+        cene    : np.array, corrected energy
     """
-    
-    
+
+    coors   = get_coors(df, krmap.coordenates) 
+    dtime   = df.dtime
+    energy  = df.energy
+
     ndim      = len(coors)
     bin_edges = krmap.bin_edges
     
@@ -348,18 +301,18 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     dt     = dtime[sel]
     ene    = energy[sel] 
     
-    eref   = krmap.eref
-    dedt   = krmap.dedt
-    dtref  = krmap.dtref 
+    e0     = krmap.e0
+    elt    = krmap.lt
     mask   = krmap.success if mask == None else mask
     
-    eref[~mask] = np.nan
+    e0[~mask] = np.nan
     
-    eref   = eref[idx]
-    dedt   = dedt[idx]
-    dtref  = dtref[idx]
+    e0   = e0[idx]
+    elt  = elt[idx]
 
-    vals   = scale * ene / (eref - dedt * (dt - dtref)) 
+    function = krfit_exp.function
+
+    vals   = scale * ene / function(dt, e0, elt)
     
     cene   = np.nan * np.ones(len(energy))
     cene[sel == True] = vals
@@ -367,71 +320,18 @@ def krmap_scale(coors, dtime, energy, krmap, scale = 1., mask = None):
     return cene
 
 
-def krmap_dtimescale(coors, dtime, krmap, scale = 1., mask = None):
-    """
-    
-    correct the energy at a given drift-time by a Krmap
-
-    Parameters
-    ----------
-    coors  : tuple(np.array), tuple with the coordinates, (x, y)
-    dtime  : np.array, drift-times
-    energy : np.array, energy
-    krmap  : KrMap, krmap object used for the correction
-    scale  : float, value to scale, default 1.
-    mask   : np.array, shape as the krmap shape, mask given bins of the krmap, default None
-
-    Returns
-    -------
-    cene    : np.array, corrected energy
-
-    """
-    
-    
-    ndim      = len(coors)
-    bin_edges = krmap.bin_edges
-    
-    idx  = [np.digitize(coors[i], bin_edges[i])-1          for i in range(ndim)]
-    sels = [(idx[i] >= 0) & (idx[i] < len(bin_edges[i])-1) for i in range(ndim)]
-    sel  = sels[0]
-    for isel in sels[1:]: sel = np.logical_and(sel, isel)
-
-    idx    = tuple([idx[i][sel] for i in range(ndim)])
-    dt     = dtime[sel]
-    #ene    = energy[sel] 
-    
-    eref   = krmap.eref
-    dedt   = krmap.dedt
-    dtref  = krmap.dtref 
-    mask   = krmap.success if mask == None else mask
-    
-    eref[~mask] = np.nan
-    
-    eref   = eref[idx]
-    dedt   = dedt[idx]
-    dtref  = dtref[idx]
-    
-    invtau = dedt/eref
-
-    vals   = scale / (1. - invtau * (dt - dtref)) 
-    
-    cfactor  = np.nan * np.ones(len(dtime))
-    cfactor[sel == True] = vals
-
-    return cfactor
-
-
-
-
+#--------------------------------
 #--- Save and Load into/from h5
+#-------------------------------
     
-
 save = prof.save
 
-load = lambda key, ifile : prof.load(key, ifile, KrMap)
+load = lambda key, ifile, map : prof.load(key, ifile, map)
 
 
-#---- Accept Residuals
+#---------------------------------------
+#    Accept Residuals - Work in progress
+#--------------------------------------
 
 def accept_residuals(residuals, 
                      nbins = 100, range = (-5, 5.),
@@ -464,8 +364,9 @@ def accept_residuals(residuals,
     return done, sel
 
 
-
-#--- Plotting
+#------------------------
+#   Plotting
+#------------------------
 
 def plot_data(df, bins):
     """
@@ -498,76 +399,8 @@ def plot_data(df, bins):
     plt.colorbar();
     plt.tight_layout();
     
-    
-def plot_res(res, a0, b0, alabel = '', blabel = ''):
-    """ plotting Result of the fit res is a list of manu experiment and have par, cov """
-    
-    alphas  = np.array([r[0][0] for r in res])
-    betas   = np.array([r[0][1] for r in res])
-    ualphas = np.array([np.sqrt(np.diag(r[1]))[0] for r in res])
-    ubetas  = np.array([np.sqrt(np.diag(r[1]))[1] for r in res])
-    cov     = np.array([r[1][0, 1]                for r in res])
-    #chi2    = np.array([r[2] for r in res])
 
-    canvas = pltext.canvas(8, 3)
-    canvas(1)
-    pltext.hist(alphas, 100);
-    plt.xlabel(alabel);
-    canvas(2)
-    pltext.hist(ualphas, 100);
-    plt.xlabel(alabel + ' uncertainty');
-    canvas(3)
-    pltext.hist((alphas - a0)/ualphas, 100);
-    plt.xlabel(alabel + ' pool');
-
-    canvas(4)
-    pltext.hist(betas, 100);
-    plt.xlabel(blabel);
-    canvas(5)
-    pltext.hist(ubetas, 100);
-    plt.xlabel(blabel + ' uncertainty');
-    canvas(6)
-    pltext.hist((betas - b0)/ubetas, 100);
-    plt.xlabel(blabel + ' pool');
-
-    canvas(7)
-    plt.hist2d(alphas, betas, (20, 20));
-    plt.xlabel(alabel); plt.ylabel(blabel); plt.colorbar();
-    canvas(8)
-    pltext.hist(cov, 100);
-    plt.xlabel('cov')
-    
-    plt.tight_layout()
-    return
-
-def plot_xyvar(var, bins = None, title = '', mask = None, nbins = 100):
-    
-    mask   = var != np.nan if mask is None else mask 
-    nx, ny = var.shape
-    bins   = (np.arange(nx+1), np.arange(ny+1)) if bins == None else bins
-    cbins  = [0.5 * (x[1:] + x[:-1]) for x in bins]
-    mesh   = np.meshgrid(cbins[0], cbins[1])
-    canvas = pltext.canvas(2, 2)
-    canvas(1)
-    uvar   = np.copy(var) 
-    if (var.dtype != bool):
-        uvar[~mask] = np.nan
-    plt.hist2d(mesh[0].ravel(), mesh[1].ravel(), bins = bins,
-               weights = uvar.T.ravel());
-    #plt.hist2d(mesh[0][mask].ravel(), mesh[1][mask].ravel(), bins = bins,
-    #           weights = var[mask].T.ravel());
-
-    plt.xlabel('x'); plt.ylabel('y'); plt.title(title);
-    plt.colorbar();
-    canvas(2)
-    #xsel = var != np.nan
-    pltext.hist(var[mask].ravel(), nbins);
-    plt.xlabel(title)
-    plt.tight_layout();
-    return
-
-
-def plot_xydt_energy_profiles(xdf, nbins = 100, names = ('dtime', 'x', 'y')):
+def plot_energy_profiles(xdf, nbins = 100, names = ('dtime', 'x', 'y', 'r', 'phi')):
     for name in names:
         zprof, _  = prof.profile((xdf[name],), xdf.energy, nbins)
         prof.plot_profile(zprof, nbins = nbins, stats = ('mean',), coornames = (name,))
