@@ -40,9 +40,14 @@ filenames = ("Tl208_NEW_v1_03_01_nexus_v5_03_04_cut50.beersheba_label_4mm.h5",
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut53.beersheba_label_4mm.h5",
              "Tl208_NEW_v1_03_01_nexus_v5_03_04_cut54.beersheba_label_4mm.h5")
 
+
 # NEXT-100 bb
 datadir   = "/Users/hernando/work/investigacion/NEXT/data/NEXT100/bb0nu/v1/"
 filenames = ("label_beersheba_554mm_0nubb.h5",) 
+
+# NEXT-100 214Bi
+datadir   = "/Users/hernando/work/investigacion/NEXT/data/NEXT100/Bi/"
+filenames = ("label_beersheba_554mm_214Bi_ICS.h5",) 
 
 
 filenames = [datadir+file for file in filenames]
@@ -388,6 +393,21 @@ def nodes_frame(clouds):
     df['node']   = nodes
     df['energy'] = enes
     df['nsize']  = sizes
+    
+    
+    f0 = 1e3
+    df['maxene']  = [f0 * np.max (clouds.energy[clouds.enode == node]) for node in nodes]
+    df['aveene']  = [f0 * np.mean(clouds.energy[clouds.enode == node]) for node in nodes]
+    df['stdene']  = [f0 * np.std (clouds.energy[clouds.enode == node]) for node in nodes]
+    
+    df['maxgrad']  = [f0 * np.max (clouds.egrad[clouds.enode == node]) for node in nodes]
+    df['avegrad']  = [f0 * np.mean(clouds.egrad[clouds.enode == node]) for node in nodes]
+    df['stdgrad']  = [f0 * np.std (clouds.egrad[clouds.enode == node]) for node in nodes]
+    
+    df['lap']  = f0 * clouds.lap[nodes]
+    df['l0']   = f0 * clouds.l0 [nodes]
+    df['l1']   = f0 * clouds.l1 [nodes]
+    df['l2']   = f0 * clouds.l2 [nodes]
     
     nnodes = len(nodes)
     df['evtene']   = np.sum(enes) * np.ones(nnodes, float)

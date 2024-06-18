@@ -79,7 +79,7 @@ def generate_kr_toy(size = 100000,
                                
 
 #---------------------------------
-#  KrMap creator
+#  (x, y) data fit in binned coordinates
 #-----------------------------------
 
 
@@ -106,10 +106,86 @@ def residuals_fun(fun, xs, ys, pars):
 
     return res, sigma, chi2
 
-krmap_fields = ('counts', 'e0', 'lt', 'ue0', 'ult', 'cov',
+# profile_fit_map_fields = ('counts', 'success', 'par', 'cov', 'sigma', 'chi2', 'pvalue',
+#                           'center_bins', 'edges_bins', 'function')
+
+# ProfileFitMap = namedtuple('ProfileFitMap', profile_fit_map_fields)
+
+# def profile_fit_map(coors, bins, x, y, function, counts_min):
+#     """
+     
+#     place data (time, energy) into bins in (coors) (i.e x, y) and fit then to a function
+#     return result
+
+#     Inputs
+#         coors      : (tuple(np.array)), tuple with the coordinates i.e (u, v)
+#         bins       : (int, tuple, or bins) i.e (20, 20), or ([0, 1., 2, 3], 1)
+#         data       : (tuple(np.array)) tuple with the data to fit, i.e (time, energy)   
+#         func       : function to fit y = function(x, *pars)
+#         counts_min : (int) minimum number of events in bin to fit
+
+#     Returns
+#         map     : (NamedTuple) see fitmap for the attributes of this named tuple
+#         residuals : (np.array), normalized residuals, same size (y - fun(x, *pars))
+#     """
+
+#     counts, ebins, ibins = stats.binned_statistic_dd(coors, y, 
+#                                                     bins = bins, statistic = 'count',
+#                                                     expand_binnumbers = True)    
+#     ibins = [b-1 for b in ibins]
+#     cbins = [0.5 * (x[1:] + x[:-1]) for x in ebins]
+
+#     ref     =  1000 
+#     if (len(ibins[0]) > ref): ref = 10 * len(ibins[0])
+
+#     indices =  ref * ibins[1] + ibins[0]
+#     #indices0 = np.array([ref * i1 + i0 for i0 in range(bins[0]) for i1 in range(bins[1])], int)
+
+#     dmap = {}
+    
+#     success = counts > counts_min
+#     res     = np.zeros(shape = counts.shape)
+#     chi2    = np.zeros(shape = counts.shape)
+#     pvalue  = np.zeros(shape = counts.shape)
+#     sigma   = np.zeros(shape = counts.shape)
+        
+#     nu, nv = counts.shape 
+#     pars = nu*[nv*[None]]
+#     covs = nu*[nv*[None]]
+
+#     residuals = np.nan * np.ones(len(y))
+
+#     for i0, i1 in np.argwhere(success == True):
+            
+#         sel = indices == int(ref * i1 + i0)
+
+#         ix, iy     = x[sel], y[sel]
+#         ipar, icov = optimize.curve_fit(function, ix, iy)
+
+#         pars [i0, i1] = ipar
+#         covs [i0, i1] = icov
+
+#         ires, isigma, ichi2 = residuals_fun(function, ix, iy, ipar)
+#         ipvalue             = stats.shapiro(res)[1] if (len(res) > 3) else 0.
+
+#         chi2  [i0, i1] = ichi2
+#         pvalue[i0, i1] = ipvalue
+#         sigma [i0, i1] = isigma
+#         residuals[sel] = ires/isigma
+    
+#     map = ProfileFitMap(counts, success, pars, covs, chi2, sigma, pvalue, cbins, ebins, function)
+#     return map, residuals
+
+# def correction_from_profile_fit_map(coors, x, y, profile_map):
+
+#     return
+
+#---------------------
+
+krmap_fields = ['counts', 'e0', 'lt', 'ue0', 'ult', 'cov',
                 'chi2', 'pvalue', 'sigma', 'success',
                 'coordenates', 'kr_fit_type',
-                'bin_centers', 'bin_edges')
+                'bin_centers', 'bin_edges']
 
 def sline_to_exp(par, var):
     opar = np.array((par[0], par[0]/par[1]))
